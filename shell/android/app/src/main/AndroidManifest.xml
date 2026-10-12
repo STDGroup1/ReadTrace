@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/AppTheme">
+        <!-- allowBackup=false（v1.94）：WebView localStorage 里有 365 天的设备凭据
+             与会话 token —— 随系统备份迁到别的设备等于把免密入口一起搬走。
+             业务数据本来就走云同步（换机登录即回），关掉备份没有损失。 -->
+
+        <activity
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode"
+            android:name=".MainActivity"
+            android:label="@string/title_activity_main"
+            android:theme="@style/AppTheme.NoActionBarLaunch"
+            android:launchMode="singleTask"
+            android:exported="true">
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+        </activity>
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths"></meta-data>
+        </provider>
+    </application>
+
+    <!-- Permissions -->
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 轻触反馈（navigator.vibrate）需要它。WebView 里的 Vibration API 在缺少该权限时
+         会静默失效：开关能打开、代码也执行了，手机就是不震 —— 从界面上看不出任何异常。
+         见 https://developer.chrome.com/docs/web-platform/vibration -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- #141「保存到手机」：API 29+ 走 MediaStore 免权限；这条只给 26-28 的老机器
+         （GallerySavePlugin 的兜底路径），29+ 不生效（maxSdkVersion 卡死）。 -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
+</manifest>

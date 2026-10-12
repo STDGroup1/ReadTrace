@@ -1,0 +1,2813 @@
+/* ===== 阅迹 ReadTrace · 交互原型样式（iOS 简约版） ===== */
+:root{
+  /* #201 换冷调浅底（照用户给的参考图：极浅蓝灰 #f1f3f7 一族，不再偏暖米）。
+     全站页面底色、状态栏（app.js 从屏顶取样）与 meta theme-color 一致跟走。 */
+  --bg:#f1f3f7;
+  --surface:#ffffff;
+  --ink:#1d1d1f;
+  --ink-2:#3c3c40;
+  --muted:#8e8e93;
+  --faint:#b9b9be;
+  --hair:rgba(0,0,0,.06);
+  --fill:rgba(120,120,128,.10);
+  --blue:#0a6cd4;
+  --blue-soft:rgba(10,108,212,.08);
+  /* 阅读足迹圆点配色（#136）：--amber/--green/--purple/--teal 原先在 app.js 里被
+     var() 引用却**全仓没有定义** → 点位背景无效、四颗圆点里三颗一直是透明的
+     （只有 --blue 那颗看得见）。这里补齐，色值取 iOS 系统色，与 .pill-ico 同源。 */
+  --amber:#ff9f0a;
+  --green:#34c759;
+  --purple:#bf5af2;
+  --teal:#30b0c9;
+  /* 日历强调色（#74，iOS 日历同款红）：今天实心圆 / 节气与农历月名小字 */
+  --cal-red:#e8402f;
+  --cal-red-soft:rgba(232,64,47,.30);      /* 今天被选中时那圈描边：淡红，不跟红圆盘抢 */
+  /* 「我的」页沉浸头部的纸感渐变（iOS 化）：色差只压到 3–5%，当氛围不当色块 */
+  --me-hero1:#f6f0e2;
+  --me-hero2:#f5eee0;
+  /* 「我的」页玻璃垫材质（#132）：帧率红线（#12/#21）不引 backdrop-filter ——
+     半透白 tint + 全环折光（上缘最亮）+ 斜向高光 + 紧实柔影模拟 Liquid Glass。
+     命名带 pad- 前缀：--glass 已被顶栏毛玻璃占用，别混。 */
+  --pad-glass:rgba(255,255,255,.34);
+  --pad-brd:rgba(255,255,255,.75);
+  --pad-rim:rgba(255,255,255,.95);
+  --pad-rim2:rgba(255,255,255,.42);
+  --pad-sheen:linear-gradient(115deg,rgba(255,255,255,.38) 0%,rgba(255,255,255,.10) 30%,transparent 48%);
+  /* 面板底（#134）：**实心** —— .72 时底下页面整片透上来，用户反馈「过于透明」
+     （编辑资料面板实拍）。扫档实测：.94 最坏差 15 级灰阶、.98 仍差 ≤4 级（约 2%，
+     字形还读得出来）→ 索性取实心，谁也别再看见底下的字。玻璃感交给顶缘细线
+     （.prof-body 的 border-top）与圆角，**别退回半透明**。 */
+  --pad-sheet:#fff;
+  --pad-pillbg:rgba(255,255,255,.45);
+  --pad-shadow:0 2px 8px rgba(30,28,25,.06),0 12px 26px rgba(30,28,25,.08);
+  --shadow:0 1px 1px rgba(0,0,0,.03),0 4px 14px rgba(0,0,0,.04);
+  --shadow-lift:0 2px 4px rgba(0,0,0,.04),0 12px 28px rgba(0,0,0,.08);
+  --ease:cubic-bezier(.25,.8,.25,1);
+  --spring:cubic-bezier(.18,1.4,.4,1);
+  /* 玻璃拟态配色：头部浮层与填充件共用。
+     --glass      头部毛玻璃底（半透明，靠 backdrop-filter 透出下方内容）
+     --glass-soft 搜索框等玻璃片底
+     --stroke     0.5px 细描边，替代实心填充来界定边界
+     --sheen      顶部 1px 内高光，制造玻璃的"受光面" */
+  --glass:rgba(247,246,243,.78);
+  --glass-soft:rgba(255,255,255,.62);
+  --stroke:rgba(0,0,0,.045);
+  --stroke-strong:rgba(0,0,0,.075);
+  --sheen:rgba(255,255,255,.9);
+  /* #180 全站统一的「iOS 玻璃」──────────────────────────────────
+     改之前：站内只有头部 / 分段器 / 「我的」页垫片 / 登录门是真玻璃，页面上的卡片、
+     行、输入框一律**实心 #fff**（在 --bg 暖纸底上就是一块白板），浮层与弹窗同理。
+     这一段把「半透明底 + 发丝描边 + 顶缘内高光 + 柔影」提成全站唯一来源：
+       --tile*  页面上的玻璃砖（卡片 / 行 / 输入框 / 小件）
+       --pane*  浮层里的玻璃片（弹窗面板）
+     ⚠️ 红线不变：只用「半透明 + 描边 + 高光 + 柔影」**模拟**，绝不 backdrop-filter
+        （低端安卓掉帧，必读 §1.2；verify_interact77 会拦 .cmp-*）。
+     ⚠️ 浅色档的发丝线必须用**深线**：白描边压在暖纸底上等于没画。
+     #201 按参考图把玻璃调冷调透一档：线用冷灰蓝、阴影拉长压淡（微质感），白度略升。 */
+  --tile:rgba(255,255,255,.70);
+  --tile-line:rgba(36,48,72,.08);
+  --tile-rim:rgba(255,255,255,.94);
+  /* 受光面三层（#180b）：竖直衰减 + 左上冷光 + 右下暖光 = 一块砖四角有微差，
+     才读得出「玻璃」；只有斜向一条高光时，在均匀底上仍是一块白板。 */
+  --tile-shine:
+    linear-gradient(176deg,rgba(255,255,255,.62) 0%,rgba(255,255,255,.18) 46%,rgba(255,255,255,.03) 100%),
+    radial-gradient(130% 120% at 6% -10%,rgba(10,108,212,.09),transparent 58%),
+    radial-gradient(140% 130% at 98% 112%,rgba(255,159,10,.08),transparent 62%);
+  --tile-sh:0 1px 2px rgba(30,38,54,.04),0 10px 26px rgba(30,38,54,.07);
+  --pane:rgba(255,255,255,.90);
+  --pane-line:rgba(28,28,30,.06);
+  --pane-sh:0 2px 6px rgba(30,28,25,.06),0 18px 44px rgba(30,28,25,.15);
+  /* 圆角尺度（#180）：全站只留四级 —— 小件 10 / 控件 14 / 卡片·面板 20 / 大面 24，
+     胶囊恒 999、圆形恒 50%。要改尺寸就改这里，别往选择器里再写一次性数值
+     （改之前散着 9/10/11/12/13/14/15/16/18/20/22/25 十一种，同一类控件三种角）。 */
+  --r-xs:10px;
+  --r-sm:14px;
+  --r-md:20px;
+  --r-lg:24px;
+  /* 首启引导登录门（#169 用户定：iOS 透明玻璃质感）：底色铺一层「氛围壁纸」
+     （三团极淡的蓝/橙/紫晕，给玻璃一点可折射的东西），控件走「半透明白玻璃」——
+     与 --pad-glass 同一套语言，只是这里的底更亮、字更大，alpha 要更高才立得住。
+     红线不变：绝不 backdrop-filter（verify_onboard 会拦这一段的字面量）。 */
+  --obd-amb1:rgba(10,108,212,.40);
+  --obd-amb2:rgba(255,159,10,.34);
+  --obd-amb3:rgba(191,90,242,.30);
+  --obd-glass:rgba(255,255,255,.55);
+  --obd-glass-line:rgba(28,28,30,.10);
+  --obd-glass-rim:rgba(255,255,255,.95);
+  --obd-glass-sh:0 1px 2px rgba(30,28,25,.05),0 10px 24px rgba(30,28,25,.09);
+  /* 主按钮：2026-10-09 用户定「蓝改黑」。深色主题下近黑按钮会糊进底色，
+     按 iOS 惯例反过来用近白 —— 两套都保持「与底最反」的那一极。 */
+  --obd-solid:#1c1c1e;
+  --obd-solid-ink:#fff;
+  --obd-solid-rim:rgba(255,255,255,.16);
+  --obd-solid-sh:0 8px 20px rgba(30,28,25,.18);
+  /* 页面底部安全距离。实测：底栏占屏幕底部 26~98px 区间，
+     六个形象实占 96px 高（顶端距底 96px）。--tab-inset 与页面末尾的
+     .pad-bottom(34px) 相加即为内容末端到屏幕底的距离，取 80+34=114，
+     留出约 18px 呼吸位，保证滚到底时最后一行不被形象压住。 */
+  --tab-inset:80px;
+  /* 原生壳（Capacitor）注入的真实安全区：状态栏/刘海与手势条高度；网页版恒为 0。
+     由 app.js 的 applyShellInsets() 写进 html 的行内样式，这里只是兜底默认值。 */
+  --safe-top:0px;
+  --safe-bottom:0px;
+  /* 软键盘遮住的高度，由 app.js 的 setupKeyboardInset() 写入；0 = 无键盘 */
+  --kb-inset:0px;
+  /* 软件封面的底色（暖米底 #e9dec6）：与封面纸块四周的留白同值，
+     启动页的封面块边缘因此与页面同色、无接缝。改这里必须同步重跑
+     gen_cover_assets.py（脚本里的 BG 常量也要一起改）。
+     本套：白卡图标 #ffffff / 中性灰线 #9a9a9a / 暖米底 #e9dec6（启动页底色）。 */
+  --cover-bg:#e9dec6;
+  /* #69：启动链路底色（系统开屏 → 封面 → bootveil → 主界面）。
+     浅色 = 封面底色；深色 = 主界面底色 —— 用 var 引用，**不引入新的硬编码色值**
+     （verify_palette 会拦 syncLaunchStatusBar 里的写死色）。 */
+  --boot-bg:var(--cover-bg);
+}
+body[data-theme="dark"]{
+  --bg:#0e0e10;
+  --boot-bg:var(--bg);
+  --surface:#1a1a1d;
+  --ink:#f5f5f7;
+  --ink-2:#d6d6db;
+  --muted:#98989f;
+  --faint:#6a6a70;
+  --hair:rgba(255,255,255,.08);
+  --fill:rgba(120,120,128,.16);
+  --blue:#3f9bfc;
+  --blue-soft:rgba(63,155,252,.14);
+  --cal-red:#ff5a47;
+  --cal-red-soft:rgba(255,90,71,.34);
+  /* 深色换暖墨渐变：暖米在深色下会「发白」（融合版取舍③） */
+  --me-hero1:#2b2521;
+  --me-hero2:#1c1916;
+  /* 深色玻璃垫（#132）：暗色 tint + 更细的反光 */
+  --pad-glass:rgba(36,36,42,.34);
+  --pad-brd:rgba(255,255,255,.22);
+  --pad-rim:rgba(255,255,255,.30);
+  --pad-rim2:rgba(255,255,255,.12);
+  --pad-sheen:linear-gradient(115deg,rgba(255,255,255,.14) 0%,rgba(255,255,255,.04) 30%,transparent 48%);
+  --pad-sheet:#1c1c21;
+  --pad-pillbg:rgba(36,36,42,.34);
+  --pad-shadow:0 2px 8px rgba(0,0,0,.4),0 12px 26px rgba(0,0,0,.45);
+  --shadow:0 1px 1px rgba(0,0,0,.3),0 6px 18px rgba(0,0,0,.35);
+  --shadow-lift:0 2px 4px rgba(0,0,0,.35),0 14px 32px rgba(0,0,0,.5);
+  /* 深色下透出的是亮色书封，会把深玻璃冲淡（实测被抬到约 #3a3838）、
+     连带压低浅灰文字对比度，故不透明度取 .88（高于浅色的 .78）。 */
+  --glass:rgba(12,12,14,.88);
+  --glass-soft:rgba(255,255,255,.10);
+  --stroke:rgba(255,255,255,.10);
+  --stroke-strong:rgba(255,255,255,.16);
+  --sheen:rgba(255,255,255,.10);
+  /* #180 深色档：暗玻璃 tint 更薄，发丝线反过来用**亮线**压在暗底上 */
+  --tile:rgba(255,255,255,.07);
+  --tile-line:rgba(255,255,255,.11);
+  --tile-rim:rgba(255,255,255,.15);
+  --tile-shine:
+    linear-gradient(176deg,rgba(255,255,255,.14) 0%,rgba(255,255,255,.04) 46%,rgba(255,255,255,0) 100%),
+    radial-gradient(130% 120% at 6% -10%,rgba(63,155,252,.16),transparent 58%),
+    radial-gradient(140% 130% at 98% 112%,rgba(255,159,10,.10),transparent 62%);
+  --tile-sh:0 1px 2px rgba(0,0,0,.35),0 10px 24px rgba(0,0,0,.42);
+  --pane:rgba(30,30,34,.90);
+  --pane-line:rgba(255,255,255,.10);
+  --pane-sh:0 2px 8px rgba(0,0,0,.4),0 20px 48px rgba(0,0,0,.55);
+  /* 登录门的玻璃材质（深色档）：暗底上白 tint 要压到 .09 才不发灰；
+     氛围晕换成更饱和的蓝紫，否则深底上看不见。 */
+  --obd-amb1:rgba(63,155,252,.30);
+  --obd-amb2:rgba(255,159,10,.16);
+  --obd-amb3:rgba(191,90,242,.28);
+  --obd-glass:rgba(255,255,255,.09);
+  --obd-glass-line:rgba(255,255,255,.16);
+  --obd-glass-rim:rgba(255,255,255,.26);
+  --obd-glass-sh:0 1px 2px rgba(0,0,0,.35),0 10px 24px rgba(0,0,0,.45);
+  --obd-solid:#f5f5f7;
+  --obd-solid-ink:#1c1c1e;
+  --obd-solid-rim:rgba(255,255,255,0);
+  --obd-solid-sh:0 8px 20px rgba(0,0,0,.5);
+}
+
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+/* 字体 —— 目标是「和 iOS 一样」，但只有两条路可走：
+   ① iOS / macOS：字体栈里的 -apple-system 直接命中系统真字体（苹方 / SF Pro），
+      与原生 App 一字不差，零改动、零体积；
+   ② Android：上面这些族名全部不存在，而苹方与 SF Pro 是苹果专有字体、不可随包分发
+      （打进 APK 属侵权），只能内置最接近的合法替代体 —— 用 HarmonyOS Sans SC，
+      几何骨架、字面大小、中宫松紧最接近苹方。
+   官方简体包只提供静态字重（Thin / Light / Regular / Medium / Bold / Black，每档约 8 MB，
+   没有可变字体版本），所以取 Regular + Medium 两档：400 走 Regular，500 / 600 / 650 走
+   Medium（声明成字重区间，浏览器不会再去合成加粗；界面里 600 与 650 因此同形，
+   它们原本也只差一档，视觉上无损）。
+   不引入 Inter：HarmonyOS Sans SC 自带拉丁与数字字形又排在字体栈首位，而字体回退是
+   按字符逐个找的，Inter 永远不会被命中，留着只是死重。
+   两个文件缺失时（网页版 / 单文件被单独拷走）静默回退 system-ui；
+   font-display:swap 保证不白屏、不闪空白。 */
+@font-face{
+  font-family:"HarmonyOS Sans SC";
+  src:url("assets/fonts/HarmonyOS_Sans_SC_Regular.ttf") format("truetype");
+  font-weight:400;font-style:normal;font-display:swap;
+}
+@font-face{
+  font-family:"HarmonyOS Sans SC";
+  src:url("assets/fonts/HarmonyOS_Sans_SC_Medium.ttf") format("truetype");
+  font-weight:500 700;font-style:normal;font-display:swap;
+}
+body{
+  font-family:"HarmonyOS Sans SC",-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro SC","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  background:#eceae6;color:var(--ink);
+  -webkit-font-smoothing:antialiased;
+  overflow:hidden;
+  /* iOS Safari：转横屏时不自作主张把字号放大一档（整页都是正文，一动排版就乱） */
+  -webkit-text-size-adjust:100%;text-size-adjust:100%;
+  /* 去安卓味：去掉滚动到边界时的边缘辉光 / 下拉刷新回弹（网页版与 App 版都受益） */
+  overscroll-behavior:none;
+}
+body[data-theme="dark"]{background:#08080a}
+button,input,textarea{font:inherit;color:inherit;border:0;background:none;outline:none}
+button{cursor:pointer}
+svg{fill:currentColor}
+/* iOS：长按图片不弹「存储图像 / 拷贝」菜单，也不许拖成半透明幽灵 ——
+   封面、底栏形象、小家伙全是 img，都是内容素材不是可搬运对象。
+   只关 callout / 拖拽，文字长按选择（#113 放行的那几块）不受影响。 */
+img{-webkit-touch-callout:none;-webkit-user-drag:none}
+
+/* ===== 舞台 =====
+   100dvh：iOS Safari 的 100vh 恒等于「工具条收起时」的大视口 —— 真机上底栏那排
+   小家伙会被展开的地址栏工具条压住一条。dvh 跟着可见区走（iOS 15.4+），
+   老引擎不认识就落回上一行 100vh，行为同旧版。 */
+.stage{height:100vh;height:100dvh;display:flex;align-items:center;justify-content:center;gap:72px;padding:24px}
+.stage-side{max-width:300px;color:#1d1d1f}
+body[data-theme="dark"] .stage-side{color:#f5f5f7}
+.side-brand{font-size:17px;font-weight:600;letter-spacing:-.2px;margin-bottom:24px;color:#8e8e93}
+.side-brand em{color:var(--blue);font-style:normal;font-weight:600}
+.stage-side h2{font-size:32px;line-height:1.22;letter-spacing:-.9px;font-weight:650}
+.stage-side p{margin-top:14px;font-size:14px;color:#8e8e93;line-height:1.7;font-weight:400}
+.side-tips{list-style:none;margin-top:30px;display:flex;flex-direction:column;gap:12px}
+.side-tips li{font-size:12.5px;color:#8e8e93;line-height:1.6;padding-left:15px;position:relative;font-weight:400}
+body[data-theme="dark"] .side-tips li{color:#98989f}
+.side-tips li::before{content:"";position:absolute;left:0;top:7px;width:4px;height:4px;border-radius:50%;background:#c9c7c1}
+body[data-theme="dark"] .side-tips li::before{background:#4a4a4e}
+.side-tips b{color:inherit;font-weight:600}
+body[data-theme="dark"] .side-tips b{color:#d6d6db}
+
+/* ===== 设备 ===== */
+.device{
+  position:relative;width:390px;height:844px;flex:none;
+  background:var(--bg);border-radius:52px;overflow:hidden;
+  border:10px solid #1c1c1e;box-shadow:0 40px 90px rgba(0,0,0,.28),0 0 0 2px #3a3a3e;
+  transition:background .5s;
+}
+.device::after{
+  content:"";position:absolute;inset:-10px;border-radius:52px;pointer-events:none;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.14);
+}
+.screen{position:absolute;inset:0;display:flex;flex-direction:column;overflow:hidden;border-radius:42px}
+
+/* 状态栏 */
+.statusbar{
+  flex:none;height:52px;display:flex;align-items:center;justify-content:space-between;
+  padding:14px 30px 0;font-size:14px;font-weight:600;letter-spacing:.2px;position:relative;z-index:20;
+}
+.st-right{display:flex;align-items:center;gap:5px}
+.battery{width:24px;height:12px;border:1.4px solid currentColor;border-radius:4px;opacity:.9;position:relative;padding:1.4px}
+.battery::after{content:"";position:absolute;right:-4px;top:3px;width:2px;height:5px;background:currentColor;border-radius:0 2px 2px 0;opacity:.5}
+.battery i{display:block;height:100%;background:currentColor;border-radius:2px}
+/* homebar：绝对定位到屏幕底部，脱离 flex 流，让 .pages 能铺满整屏 */
+.homebar{
+  position:absolute;left:0;right:0;bottom:0;z-index:30;
+  height:26px;display:flex;align-items:flex-end;justify-content:center;padding-bottom:8px;
+}
+.homebar span{width:134px;height:5px;border-radius:3px;background:var(--ink);opacity:.85}
+
+/* ===== 页面容器 =====
+   .pages 铺满状态栏以下的整屏，内容可以从 TabBar 背后穿过；
+   底部 padding 保证滚到底时最后一行内容仍露在形象之上，不会被压住。 */
+.pages{position:relative;flex:1;overflow:hidden}
+.page{
+  position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;
+  /* #182：上内边距 6px → 0 —— 那 6px 原先落在**页头上面**，是「页头上方那条没被盖住的
+     折射底」的成因（见 .pg-head 那条注释）。去掉后页头自己补回同样的 6px。 */
+  padding:0 20px var(--tab-inset);-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
+  /* #180：页面上垫一层**极淡的「折射底」**—— 玻璃片要有颜色可折才像玻璃
+     （这套材质的作者在 .obd-glow 上写过同一句话：没有它，半透明控件就只是灰方块）。
+     两层径向晕都只铺到屏顶往下 ~230px 就收干净；下面那条线性罩到 240px 归零。
+     ⚠️ 底部边距带必须**恒等于 --bg**：verify_bottom 在那一带按像素取样（Δ≤3），
+        所以这里一个百分点都不许铺到屏底。 */
+  background:
+    radial-gradient(118% 300px at 18% -70px, rgba(10,108,212,.055), transparent),
+    radial-gradient(118% 300px at 84% -90px, rgba(255,159,10,.055), transparent),
+    linear-gradient(180deg, rgba(255,255,255,.55), rgba(255,255,255,0) 240px),
+    var(--bg);
+  opacity:0;transform:scale(.988);pointer-events:none;
+  transition:opacity .34s var(--ease),transform .42s var(--ease);
+}
+.page.is-active{opacity:1;transform:none;pointer-events:auto}
+/* #180 深色档的折射底：白罩几乎撤掉（暗底上会发灰），换成两团更饱和的蓝紫 / 暖橙 */
+body[data-theme="dark"] .page{
+  background:
+    radial-gradient(118% 300px at 18% -70px, rgba(63,155,252,.10), transparent),
+    radial-gradient(118% 300px at 84% -90px, rgba(255,159,10,.06), transparent),
+    linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,0) 240px),
+    var(--bg);
+}
+.pad-bottom{height:34px}
+
+/* 通用头部 —— 玻璃浮层
+   sticky 粘在页顶：滚动时书封从下方经 backdrop-filter 模糊穿过，
+   这是"透明质感"的唯一来源（若头部不粘住，其背后永远是纯 --bg，模糊不可见）。
+   左右负外边距让玻璃带铺满整宽。
+   ⚠️ 顶部**不再**给负外边距（#165）：原先那条 `-6px` 只把页头的**流盒**上移 6px，
+   它的视觉位置本来就贴着滚动口的内容边缘（实测 top=58 = .page 顶 52 + 内边距 6），
+   于是流盒底比玻璃带下沿高 6px —— 紧跟其后的第一块内容被玻璃页头吃掉顶上 6px
+   （书单页「＋ 新建书单」的圆角与虚线顶边整个被切；5 个页面都被压 4~6px，
+   只是别的页第一块是整张卡片/大图，看不出切口）。
+   去掉后页头的视觉位置一字不变（像素比对过顶部整条玻璃带），内容整体落到页头下沿。
+   #182：上内边距 14px → 20px，正好抵掉 .page 去掉的那 6px 上内边距 —— 于是
+   **页头贴到页顶、下沿（那条发丝线）与首块位置一格不动**。
+   原先那 6px 落在页头**上面**，是页头上方那条「没被盖住的折射底」的成因：
+   深色档实测 rgb(36,38,42)，同一列周围只有 rgb(15,15,17)（2.4 倍亮、满宽 6px 一条），
+   用户在书架页看见的就是它（2026-10-10：「顶部那条框…书架框融为一体啊，跟整个页面」），
+   随后点名「其他页面也是」→ 所以这一处**全站页头共用**，不是逐页值。 */
+.pg-head{
+  position:sticky;top:0;z-index:12;
+  margin:0 -20px 0;padding:calc(20px + var(--safe-top)) 20px 16px;
+  background:var(--glass);
+  /* 半径取 32px（约设备宽的 8%）：书封是大面积纯色，模糊半径过小会残留成块，
+     半径够大时颜色才弥散为柔光，既保留"底下有东西"的层次，又不抢标题。 */
+  -webkit-backdrop-filter:blur(36px) saturate(150%);
+  backdrop-filter:blur(36px) saturate(150%);
+  box-shadow:0 .5px 0 var(--stroke);
+  transition:background .4s var(--ease);
+}
+.pg-title-row{display:flex;align-items:center;gap:10px}
+/* #201 照参考图：页头大标题加大加重（书单/互动那种一眼的大黑字） */
+.pg-title{font-size:33px;font-weight:700;letter-spacing:-1px;line-height:1.1}
+/* 徽章照参考图改成小圆牌（互动页「2」那种灰圆） */
+.pg-badge{
+  font-size:12px;font-weight:600;color:var(--muted);
+  background:rgba(120,120,128,.10);box-shadow:inset 0 0 0 .5px var(--stroke);
+  min-width:24px;height:24px;padding:0 7px;border-radius:999px;display:grid;place-items:center;margin-top:4px;
+}
+.pg-sub{margin-top:5px;font-size:13px;color:var(--muted);line-height:1.55;font-weight:400}
+/* 深色下头部玻璃透出亮色书封、底色被提亮，--muted(#98989f) 对比不足，
+   故头部内的次级文字整体上提一档；选中态 .seg.is-on 不在此列（它用 --ink）。 */
+body[data-theme="dark"] .pg-head .pg-sub,
+body[data-theme="dark"] .pg-head .pg-badge,
+body[data-theme="dark"] .pg-head .seg:not(.is-on){color:#b4b4bc}
+/* .sec-title/.section-row/.sec-more/.muted 已删（v1.94）：js/html 零引用的死样式 */
+
+
+/* 分段控件 —— 各自独立的胶囊
+   旧版是「一条灰色轨道 + 内部滑动的白胶囊」：块面被轨道整体框住，视觉上是一个控件。
+   现拆为各自成块的胶囊——外层去掉轨道底色与内描边，仅作排布容器；
+   每块自带玻璃底 + 0.5px 描边 + 顶部高光，互不相连，即 iOS 标签筛选器的观感。
+   容器用 space-between：块宽贴合文字（min-width 兜底避免两个字太窄），
+   多块时在整行内均分剩余空间，间隙随屏宽自适应。
+   ⚠️ 现役三处都在用（日记页 列表/日历、编辑浮层 状态三选一、合规页 两份文档），
+   都是两块以上；书架页原先那孤零零的一格已随 #94 整条删掉，不再出现「只剩一块」的情形。 */
+.segmented{
+  display:flex;justify-content:space-between;gap:8px;margin-top:12px;
+}
+.seg{
+  flex:0 0 auto;min-width:66px;height:32px;padding:0 16px;
+  /* 半径取 999px 而非固定值：无论块被撑到多宽都保持标准胶囊轮廓 */
+  border-radius:999px;
+  font-size:12.5px;font-weight:500;color:var(--muted);
+  background:var(--glass-soft);
+  /* #180d：不再自背一层 blur —— 它整颗坐在 `.pg-head` 里，页头已经有 blur(36px)，
+     再叠一层看不出差别、只多一份合成开销（本条理由原本就写在本文件里）。 */
+  box-shadow:inset 0 0 0 .5px var(--stroke),inset 0 1px 0 var(--sheen);
+  transition:background .3s var(--ease),color .3s,box-shadow .3s,transform .25s var(--spring);
+}
+/* ⚠️ 全文件所有 :hover 都必须待在 @media (hover:hover) 里：iOS 的触摸点按会先落一个
+   悬停态、且**粘住不散**（点完书脊它一直悬着，直到点别处才落回）——
+   悬停是鼠标的修饰，触摸设备一律跳过。 */
+@media (hover:hover){.seg:hover{background:rgba(255,255,255,.86);box-shadow:inset 0 0 0 .5px var(--stroke-strong),inset 0 1px 0 var(--sheen)}}
+/* 按压回弹：与底栏形象的果冻语言保持一致，但幅度收敛到 .96 */
+.seg:active{transform:scale(.96)}
+/* #201 选中态照参考图改「黑胶囊」：白字压黑，与「保存」那颗黑胶囊主按钮同一套
+   语言（令牌复用 --obd-solid*，深色档自动翻转成近白，不另写一套）。 */
+.seg.is-on{
+  background:var(--obd-solid);color:var(--obd-solid-ink);font-weight:600;
+  box-shadow:inset 0 .5px 0 var(--obd-solid-rim),0 2px 8px rgba(30,38,54,.16);
+}
+body[data-theme="dark"] .seg{
+  background:rgba(255,255,255,.08);
+  box-shadow:inset 0 0 0 .5px var(--stroke),inset 0 1px 0 var(--sheen);
+}
+@media (hover:hover){body[data-theme="dark"] .seg:hover{background:rgba(255,255,255,.14)}}
+body[data-theme="dark"] .seg.is-on{
+  background:var(--obd-solid);
+  box-shadow:inset 0 .5px 0 var(--obd-solid-rim),0 2px 8px rgba(0,0,0,.4);
+}
+/* 极窄屏（<360px）：四块等距排布会因 min-width 溢出，此屏宽下放开最小宽度与内距。 */
+@media (max-width:360px){
+  .seg{min-width:0;padding:0 12px}
+}
+
+/* ===== 书架 · 木书架（#78；#116 视频化重排）=====
+   #116：柜内独立滚动 + 底部滑动条 —— 手机一屏看不全五层柜。
+   .page[data-page=shelf] 转 flex 列：页头固定，柜体吃掉剩余高度自行滚动，
+   滑动条贴在底栏之上；拖 thumb = 滚柜，滚柜 = thumb 跟随（app.js setupShelfSlider）。
+
+   #182（全站口径，不是逐页值）：页头顶到页顶 —— `.page` 的上内边距归零、页头自己补回 6px，
+   页头上方那条「没被盖住的折射底」因此在**每一页**都消失；页头下沿与首块位置一格不动。
+   原委与判据见 `.pg-head` 那条注释；`_probe_182gap.js` 逐页量：strip 6 → 0、各页 gap 原样
+   （书架 2 / 日记 2 / 互动 16 / 书单 16）。 */
+.page[data-page="shelf"]{display:flex;flex-direction:column}
+.page[data-page="shelf"] .pg-head{flex:none}
+.shelf-scroll{
+  flex:1;min-height:0;min-width:0;
+  /* #201：纵向也放开 —— 柜子满了往下加层（sizeCabinet 撑高柜体），柜内上下滚；
+     五层以内柜高仍是 100%，这里照旧滚不动，观感一格不变。 */
+  overflow:auto;overscroll-behavior-x:contain;
+  margin-top:2px;-webkit-overflow-scrolling:touch;
+  position:relative;
+}
+/* 底部滑动条：细轨 + 按可见比例定宽的圆头 thumb；不可滚（柜比屏矮）时整条隐藏 */
+.shelf-slider{flex:none;display:flex;align-items:center;height:40px;padding:0 2px}
+.shelf-slider[hidden]{display:none}
+.ss-track{
+  position:relative;flex:1;height:5px;border-radius:999px;
+  background:rgba(0,0,0,.10);box-shadow:inset 0 0 0 .5px rgba(0,0,0,.06);
+  touch-action:none;cursor:pointer;
+}
+.ss-thumb{
+  position:absolute;left:0;top:0;height:100%;width:56px;border-radius:999px;
+  background:var(--ink);opacity:.42;
+  box-shadow:0 1px 3px rgba(0,0,0,.20);
+}
+body[data-theme="dark"] .ss-track{background:rgba(255,255,255,.10)}
+
+/* #206：页头的阅读状态筛选（全部 / 在读 / 已读）—— 三块均分整行。
+   `.segmented` 自带的 space-between 是给「块宽贴合文字」的排布用的（#58 那条四格筛选器），
+   这里三块要撑满整行，故同日记页 #recView 一样把块放开成 flex:1。
+   手机值：整条 32px 高 + 12px 上距，页头因此长高 44px（柜体 flex:1 自己让出来）。 */
+#shelfFilter{margin-top:12px}
+#shelfFilter .seg{flex:1 1 0;min-width:0}
+
+/* #206：筛到一本书都没有时压的那句说明。挂在 `.shelf-scroll` 里（柜外）——
+   柜体横向 260% 宽、overflow:hidden，挂进去会被裁；且视口只看得见柜子左边一条，
+   所以文案一律贴左（同 #117 把 .cab-tag 挪到层板左头的那条理由）。
+   pointer-events:none：它只是块玻璃上的字，绝不许挡住拖书 / 滚柜。 */
+.shelf-none{
+  position:absolute;left:22px;top:50%;transform:translateY(-50%);z-index:3;
+  font-size:13px;letter-spacing:.3px;color:rgba(246,236,214,.78);
+  text-shadow:0 1px 2px rgba(0,0,0,.45);pointer-events:none;
+}
+/* ⚠️ 这条是**保险**：`.shelf-none` 自己不写 display，UA 的 `[hidden]{display:none}` 本来
+   就够用（同 .shelf-slider[hidden]）。显式再写一遍，是防将来有人给这条规则补 display ——
+   类选择器一旦带上 display，UA 那条就再也压不住（§1.2 的 `grid` 盖 `[hidden]` 老坑）。 */
+.shelf-none[hidden]{display:none}
+
+/* ===== 木柜本体（#78 视觉照 shelf.stories 实拍：深棕木柜 + 横纹层板，零图片资产）
+   视觉参照 shelf.stories 的实体书架：深棕木柜 + 横纹层板，书脊竖排、
+   放满一层自动换层。全部 CSS 渐变，零图片资产。
+   木色与主题 INK(#5A4632) 同族；暗色模式下柜体本来就深，无需分支。 */
+.cabinet{
+  /* #117：一整面书架墙 —— 柜子横向比屏宽（260%，窄屏兜底 980px），
+     纵向压满一屏（五层均分高度，不上下滚），底部滑动条左右平移看这面墙。
+     #81 iOS 化：圆角对齐全局卡片（18px），外阴影换成 iOS 的分层柔影。
+     柜内纵深（inset 上下压暗 + vignette）是视频的实拍感来源，原样保留。 */
+  height:100%;width:260%;min-width:980px;
+  display:flex;flex-direction:column;
+  border-radius:18px;overflow:hidden;
+  border:7px solid #4a3220;
+  /* 背板：竖木纹 + 中央偏亮的纵深光（vignette），照着视频柜内「中间受光、四角沉暗」；
+     内阴影给柜口上下压出深度 */
+  background:
+    radial-gradient(130% 84% at 50% 42%, rgba(255,216,150,.13), transparent 62%),
+    repeating-linear-gradient(90deg, rgba(0,0,0,.10) 0 3px, transparent 3px 11px, rgba(255,255,255,.02) 11px 13px, transparent 13px 30px),
+    linear-gradient(180deg, #3a2818 0%, #46311d 42%, #352413 100%);
+  padding:10px 10px 0;
+  box-shadow:
+    0 1px 1px rgba(74,50,32,.10),
+    0 8px 22px rgba(74,50,32,.13),
+    inset 0 1px 0 rgba(255,240,215,.10),          /* iOS 控件的顶部受光边 */
+    inset 0 0 0 .5px rgba(255,240,215,.14),
+    inset 0 14px 22px rgba(0,0,0,.34),
+    inset 0 -10px 18px rgba(0,0,0,.28);
+}
+.cab-row{flex:1;min-height:0;display:flex;align-items:flex-end;justify-content:flex-start;padding:0 4px}
+/* 层板：横贯全宽的木条，压在下一层书顶之上（#79 二段加厚；#117 压到 14px 给五层让高度） */
+.cab-plank{
+  height:14px;margin:0 -10px;position:relative;flex:0 0 auto;
+  background:
+    repeating-linear-gradient(90deg, rgba(255,255,255,.05) 0 6px, rgba(0,0,0,.06) 6px 14px, transparent 14px 26px),
+    linear-gradient(180deg, #a87c4e 0%, #8a6640 30%, #7d5a38 58%, #4e351d 100%);
+  border-top:1px solid rgba(255,235,200,.42);
+  box-shadow:0 4px 8px rgba(0,0,0,.32);   /* #81：与柜体同步减轻，避免层板"压塌"下层的书 */
+}
+.cab-plank::after{content:"";position:absolute;left:0;right:0;bottom:-4px;height:4px;
+  background:linear-gradient(180deg, rgba(0,0,0,.45), transparent)}
+/* 层板中央的小标签：照视频「Shelf 01 · 26 books」——中文版压在层板正中 */
+/* #81：改成 iOS 胶囊——半透明底 + 0.5px 描边 + 柔影 + 顶部高光来模拟玻璃。
+   刻意不用 backdrop-filter：它在低端安卓上掉帧（用户刚因卡顿否掉 3D），
+   且 verify_interact77 会拦 .cmp-* 里的 backdrop-filter，这里也一并守同一原则。 */
+/* #117：柜子横向比屏宽后，标签若居中会在视口外 —— 挂到每层左端，
+   像贴在层板左头的实物标签，随手势一起平移 */
+.cab-tag{
+  position:absolute;left:14px;top:50%;transform:translateY(-50%);
+  font-size:9.5px;font-weight:600;letter-spacing:.5px;white-space:nowrap;
+  color:#f6ecd6;background:rgba(46,30,16,.42);
+  padding:2px 9px;border-radius:999px;
+  box-shadow:
+    inset 0 .5px 0 rgba(255,240,214,.24),
+    inset 0 0 0 .5px rgba(255,240,214,.20),
+    0 1px 3px rgba(0,0,0,.30);
+  text-shadow:0 1px 1px rgba(0,0,0,.35);
+}
+/* 书脊：宽/高/斜靠/书口纸页全部由书 id 哈希稳定决定（strHash），刷新不变 */
+/* #81 iOS 化：书脊也是「控件」——加 iOS 标志性的内顶高光、圆角放大到 4px、
+   动效改用弹性曲线（--spring），按压按 iOS 规范缩到 .96 并轻微压暗。 */
+.spine{
+  /* #117：高度不再由 JS 写死 —— 书脊 = 所在层高的 100%-8px（五层均分一屏），
+     宽度仍是 id 哈希的稳定 px 值（renderShelf） */
+  position:relative;flex:0 0 auto;height:calc(100% - 8px);cursor:pointer;border-radius:4px 4px 1px 1px;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.34),      /* 顶部受光边 */
+    inset 2px 0 3px rgba(255,255,255,.26),
+    inset -3px 0 4px rgba(0,0,0,.34),
+    inset 0 0 0 .5px rgba(0,0,0,.16),         /* 0.5px 细描边界定边界 */
+    2px 0 5px rgba(0,0,0,.26);
+  transition:transform .22s var(--spring), filter .18s var(--ease), box-shadow .18s var(--ease);
+  -webkit-tap-highlight-color:transparent;
+  /* #200：长按书脊要弹「删除」—— 同 #178 书单的口径先关掉选中与 callout，
+     不然 Android WebView 会先弹系统菜单，我们的长按根本收不到。 */
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
+}
+@media (hover:hover){.spine:hover{transform:translateY(-7px);filter:brightness(1.12);z-index:2}}
+.spine:active{transform:translateY(-2px) scale(.96);filter:brightness(.94)}
+/* #92 起书脊上写的是**书名**，不是封面图 —— 封面留给点开后的详情那一张。
+   竖排允许折行：书脊最窄 26px，字号 11.5px 时一列约 12px，折两列还放得下；
+   折不动的（长书名）由 overflow 从左侧裁掉，保留的永远是开头那几个字。
+   ⚠️ 别改回 nowrap —— 那样书名一律只显示到第一个截断处，等于看不出是什么书。 */
+.spine .t{
+  writing-mode:vertical-rl;color:rgba(255,255,255,.94);
+  font-size:10px;font-weight:600;letter-spacing:.5px;line-height:1.12;
+  text-shadow:0 1px 2px rgba(0,0,0,.45);
+  max-height:86%;overflow:hidden;
+  pointer-events:none;
+}
+/* 顶/底书壳压线 */
+.spine::before{content:"";position:absolute;left:0;right:0;top:9px;height:1px;
+  background:rgba(0,0,0,.28);box-shadow:0 -2px 0 rgba(255,255,255,.18);pointer-events:none}
+.spine::after{content:"";position:absolute;left:0;right:0;bottom:9px;height:1px;
+  background:rgba(0,0,0,.28);box-shadow:0 2px 0 rgba(255,255,255,.18);pointer-events:none}
+/* 厚书书口露纸页（右缘细密横纹） */
+.spine .pgs{position:absolute;top:6px;bottom:6px;right:0;width:4px;
+  background:repeating-linear-gradient(180deg,#efe6d2 0 2px,#cbbfa4 2px 3px);
+  border-radius:0 1px 1px 0;opacity:.9;pointer-events:none}
+/* 斜靠：靠在左邻书身上（行首不斜，由哈希条件排除） */
+.spine.lean{transform:rotate(-7deg) translateX(2px);margin-left:-13px}
+@media (hover:hover){.spine.lean:hover{transform:rotate(-7deg) translateX(2px) translateY(-6px)}}
+.spine.lean:active{transform:rotate(-7deg) translateX(2px) translateY(-2px) scale(.96);filter:brightness(.94)}
+/* #92：书脊不再贴封面图 —— 自传封面只用来取主色（c1/c2），脊上写书名。
+   .imgcover 这条规则留着是为了"误贴了图"时也不压字，但现在 JS 已不再产出它。 */
+.spine.imgcover .t{display:none}
+.spine.imgcover{background-size:cover;background-position:center;box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.30),      /* #81：与无图书脊保持同一套高光/描边语汇 */
+    inset 0 0 0 .5px rgba(0,0,0,.20),
+    inset -3px 0 4px rgba(0,0,0,.34),
+    2px 0 5px rgba(0,0,0,.26)}
+/* 封面朝外的平铺书（#79 二段）：宽 ≈ 高 × 0.72，罩一层右侧落影显凸出；
+   书名横排压在封面上（无图时），有图直接用图。 */
+.spine.faceout{
+  border-radius:6px;align-items:flex-end;justify-content:flex-start;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.30),      /* 与书脊一致的顶部受光 */
+    inset 0 0 0 .5px rgba(0,0,0,.22),
+    0 2px 4px rgba(0,0,0,.20),
+    4px 5px 12px rgba(0,0,0,.34);             /* 分层柔影：近处贴合 + 远处扩散 */
+  padding:8px 9px;
+  transition:transform .22s var(--spring), filter .18s var(--ease);
+  -webkit-tap-highlight-color:transparent;
+}
+@media (hover:hover){.spine.faceout:hover{transform:translateY(-8px)}}
+.spine.faceout:active{transform:translateY(-3px) scale(.97);filter:brightness(.95)}
+.spine.faceout .t{display:none}
+.spine.faceout .ft{
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
+  color:#fff;font-size:11.5px;font-weight:650;line-height:1.25;letter-spacing:-.2px;
+  text-shadow:0 1px 3px rgba(0,0,0,.4);position:relative;z-index:1;
+}
+.spine.faceout .fa{
+  display:block;color:rgba(255,255,255,.82);font-size:8.5px;margin-top:3px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  text-shadow:0 1px 2px rgba(0,0,0,.4);position:relative;z-index:1;
+}
+/* #200 长按亮出的那本：抬起定格（借 hover 的动作语言）+ 一圈玻璃亮边，
+   让「按住的是这一本」在密密一排里一眼可辨。斜靠书保住它自己的 rotate（不许突然立正）。
+   这两条排在全部 hover/:active 之后 —— 桌面上悬停已亮着的书时，armed 的定格赢。 */
+.spine.is-armed{
+  transform:translateY(-8px);filter:brightness(1.14);z-index:3;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.40),
+    inset 2px 0 3px rgba(255,255,255,.30),
+    inset -3px 0 4px rgba(0,0,0,.34),
+    inset 0 0 0 .5px rgba(255,255,255,.38),
+    0 10px 22px rgba(0,0,0,.40),
+    0 0 0 3px rgba(255,255,255,.14);
+}
+.spine.lean.is-armed{transform:rotate(-7deg) translateX(2px) translateY(-8px)}
+.spine.faceout.is-armed{transform:translateY(-8px)}   /* 平铺书无 rotate，同款抬起 */
+/* 封面渲染块（coverHTML 的产物）：书籍详情（.bs-cover 108×147）与书单缩略图
+   （.lsx-cv / .lpk-cv）共用（原先还与「翻开这本书」的飞入封面共用，随阅读线删除）。
+   书脊一律写书名、绝不贴
+   封面图（#79/#92）；书封是**可选项**（#150：用户可以自己选上传还是不上传），
+   不上传就走配色封面。
+   ⚠️ 上面那条注释原先漏掉了收尾符（#117 删 .shelf-empty 规则时一起带走），
+   于是这五条 .cover-* 规则被整段吞掉：书单里没传封面的书缩略图成了空白方块、
+   详情页的封面也塌成 108×84、`.pbar` 一并失效（#150 修复）。
+   写注释时别把注释收尾符原样写进正文 —— 一样会提前闭合。 */
+.cover-art{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:space-between;padding:14px}
+.cover-spine{position:absolute;left:0;top:0;bottom:0;width:4px;background:rgba(0,0,0,.18)}
+.cover-line{width:20px;height:2px;background:currentColor;opacity:.5;border-radius:2px}
+.cover-title{font-size:15px;font-weight:650;line-height:1.3;letter-spacing:-.2px;color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.18)}
+.cover-author{font-size:10px;color:rgba(255,255,255,.75);margin-top:4px;font-weight:400}
+.cover-tag{
+  /* 原带 backdrop-filter:blur(6px) —— 项目红线（低端安卓掉帧）不引这个属性，
+     这条规则被吞掉的几年里反而没在跑；借复活之机去掉模糊，改纯半透明底。 */
+  position:absolute;top:10px;right:10px;font-size:9px;font-weight:600;letter-spacing:.4px;
+  color:rgba(255,255,255,.95);background:rgba(0,0,0,.26);
+  padding:3px 8px;border-radius:20px;
+}
+/* .pbar 块保留（v1.94 复核后恢复）：js/html 当前零引用，但 verify_css_syntax.py
+   的回归护栏**点名要它在**（#150 那段曾整段被注释吞掉，护栏就是那次事故立的）——
+   别删，删了套件假红。 */
+.pbar{height:3px;border-radius:2px;background:var(--fill);margin-top:8px;overflow:hidden}
+.pbar i{display:block;height:100%;border-radius:2px;background:var(--ink);opacity:.85;width:0;transition:width .9s var(--ease)}
+.pbar-txt{font-size:10px;color:var(--faint);margin-top:5px;font-weight:400}
+
+/* ===== 记录 · 时间线 =====
+   版式来源：参考图。一条纵向时间流 —— 按天分组（虚线圆点 + 日期 + 细横线作分隔），
+   卡片奇偶左右交错（偶数项缩进，卡片更窄、靠右）。
+   全部用主题变量书写：深色下即参考图的观感，浅色下自动反转为浅底时间线。
+   头像仍是「书封同色系的渐变块」——项目内没有任何人物/照片素材，这样既不引入
+   图片资源、不增加单文件体积。（列表里那块配图位 #168 已退役，见下面那条注释。） */
+
+/* 顶部条：三栏等宽，标题因此严格居中（左右各一个 32px 的占位/按钮）。
+   #182：这条窄条自己也有上下内边距，同样要补回 .page 去掉的那 6px（14 → 20 的口径）——
+   否则本页页头上方照样会露一条折射底。9 → 15，下沿与首块位置不变。 */
+.tl-head{padding:calc(15px + var(--safe-top)) 18px 11px}
+.tl-bar{display:flex;align-items:center;gap:8px}
+.tl-bar-pad,.pg-add{width:44px;height:44px;flex:none}
+/* #201 照参考图：居中标题加大一档（「日记」两个字立得住） */
+.tl-bar-title{flex:1;text-align:center;font-size:21px;font-weight:700;letter-spacing:.2px}
+/* 页头右上角的新增按钮（共用件）。#191 起三页同一套：书架 #shNew / 互动 #ltNew /
+   记录页那颗笔 #tlNew —— 原先的右下角悬浮加号 `.fab` 整体删除（见 .fab 那段旧址说明）。
+   #192：32px → **44px**（用户：「放在右上角那个，有点太小了」）。44 也是 iOS 的最小点按尺寸，
+   图标跟着 16 → 22px。⚠️ 记录页那条窄条是「左右各一个**等宽**占位」的居中布局，
+   所以 `.tl-bar-pad` 必须跟着按钮一起变（漏了标题就被挤歪）。
+   ⚠️ 页面标题行是左对齐的，靠 `.pg-title-row .pg-add` 的 `margin-left:auto` 把它顶到右边；
+   那条 margin 只写进标题行，别写进这一条基础规则（会把窄条的标题挤歪）。 */
+.pg-add{
+  /* #201 照参考图：右上角的新增钮是**圆形**玻璃钮（日记页的笔、互动页的 ＋ 同款） */
+  border-radius:50%;display:grid;place-items:center;color:var(--ink);
+  background:var(--glass-soft);
+  /* #180d：同 .seg —— 坐在已模糊的页头里，这层 blur 是纯开销 */
+  box-shadow:inset 0 0 0 .5px var(--stroke),inset 0 1px 0 var(--sheen);
+  transition:background .25s var(--ease),transform .25s var(--spring);
+}
+.pg-title-row .pg-add{margin-left:auto}
+@media (hover:hover){.pg-add:hover{background:rgba(255,255,255,.86)}}
+.pg-add:active{transform:scale(.92)}
+@media (hover:hover){body[data-theme="dark"] .pg-add:hover{background:rgba(255,255,255,.14)}}
+
+/* 视图切换：列表 / 日历。
+   原先这里是「年份快切胶囊 + 日历入口按钮」——同一件事的第二、三套入口。
+   现在收成一个 seg；只有两块，故压掉 .segmented 的 space-between
+   （那是给书架四块筛选器排布的），让两块均分整行。
+   seg 自身不加 backdrop-filter —— 头部已有一层 36px 模糊，再叠一层看不出差别、
+   又多一份开销（backdrop-filter 是本页最贵的一项）。 */
+.tl-nav-bar{display:flex;align-items:center;margin-top:9px}
+#recView{margin-top:0;flex:1}
+#recView .seg{flex:1 1 0;min-width:0}
+
+/* =========================================================
+   日历视角：月历直接铺在页面上
+   原先是「整屏浮层 + 年/月/日三档 + 12 个月小日历」，与头部的年份胶囊、
+   写日记抽屉里的月历三者互相重复，同一件事三套入口。
+   现在只留这一份：单月大日历 + 年份网格（与写抽屉共用 yearGridHTML），
+   点某天在下方直接列出那天的内容，不跳走。
+   ========================================================= */
+.rec-cal{padding:2px 2px 0}
+.rec-cal[hidden]{display:none}
+
+.rc-head{display:flex;align-items:center;justify-content:center;gap:6px;padding:2px 0 12px}
+.rc-nav{
+  width:28px;height:28px;border-radius:50%;font-size:15px;line-height:1;color:var(--muted);
+  display:grid;place-items:center;
+  transition:background .2s var(--ease),transform .22s var(--spring),opacity .2s;
+}
+.rc-nav.is-jump{font-size:17px}
+@media (hover:hover){.rc-nav:not(:disabled):hover{background:var(--fill)}}
+.rc-nav:not(:disabled):active{transform:scale(.88)}
+.rc-nav:disabled{opacity:.22}
+/* 月份标题兼作「年份网格」的开关：月 ↔ 年在同一个位置切，不新增入口 */
+.rc-title{
+  min-width:136px;height:32px;padding:0 12px;border-radius:var(--r-xs);
+  font-size:14.5px;font-weight:600;color:var(--ink);letter-spacing:.2px;
+  font-variant-numeric:tabular-nums;
+  transition:background .22s var(--ease),transform .22s var(--spring),box-shadow .22s;
+}
+.rc-title:active{transform:scale(.95)}
+.rc-title.is-open{background:var(--blue-soft);box-shadow:inset 0 0 0 1px var(--blue);color:var(--blue)}
+
+/* #74：月历 8 列 —— 最左一列是周数（iOS 同款），右侧 7 列才是星期/日期 */
+.rc-week{display:grid;grid-template-columns:24px repeat(7,1fr);padding:0 0 5px;border-bottom:1px solid var(--hair)}
+.rc-week i:first-child{visibility:hidden}   /* 周数列头上没有名字 */
+.rc-week i{font-size:10.5px;font-style:normal;text-align:center;color:var(--muted)}
+.rc-grid{display:grid;grid-template-columns:24px repeat(7,1fr);gap:2px;padding:8px 0 6px}
+/* 日历视角里的格子比浮层时代更大：它现在是页面主角，不再是浮层里的配角 */
+.rc-grid .cald{height:50px;border-radius:15px}
+.rc-ygrid{padding-top:4px}
+/* #74 教训：这几个容器自带 display 声明（grid / flex），与 UA 的 [hidden]{display:none}
+   同权重但排在它后面 —— 只设 hidden 属性收不起来，切视图时新旧面板会叠着画。
+   （探针的 vis() 若短路在 el.hidden 上还会假 PASS，所以判据必须看 computed display。）*/
+.rc-week[hidden],.rc-grid[hidden],.rc-ygrid[hidden]{display:none}
+
+/* #126 月历翻页动效：点 ‹ › 与手势左右滑共用 —— 内容从手指来的方向滑入
+   （去下月/下年从右进、回上月/上年从左进）。只动 transform/opacity 不触布局；
+   页面日历的 18px 位移落在 .page 的 20px 边距里（overflow-x:hidden 双保险），
+   抽屉的 .tlc-cal 自带 overflow:hidden。 */
+@keyframes calInNext{from{transform:translateX(18px);opacity:.3}to{transform:none;opacity:1}}
+@keyframes calInPrev{from{transform:translateX(-18px);opacity:.3}to{transform:none;opacity:1}}
+.cal-in-next{animation:calInNext .24s cubic-bezier(.25,.8,.35,1)}
+.cal-in-prev{animation:calInPrev .24s cubic-bezier(.25,.8,.35,1)}
+
+/* 日期格（#74 改 iOS 日历风格）：两层 —— 公历大字 + 农历/节气小字；
+   最左列是周数小字。有日记的日子带一个小点，今天画红色实心圆（只圈数字），
+   被点中的日子描边。日历视角与写日记抽屉里的月历共用这一份 —— 两侧只差尺寸。 */
+.cald,.cd{
+  position:relative;border-radius:13px;color:var(--ink);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
+  transition:background .2s var(--ease),color .2s,transform .16s var(--spring);
+}
+.cald b,.cd b{font-weight:450;color:inherit;font-variant-numeric:tabular-nums;line-height:1.1}
+.cald span,.cd span{
+  font-size:8.5px;line-height:1.15;color:var(--muted);letter-spacing:.2px;
+  white-space:nowrap;font-weight:450;
+}
+.cald span.is-term,.cd span.is-term,
+.cald span.is-mon,.cd span.is-mon{color:var(--cal-red)}
+.cald-wn,.cd-wn{          /* 行首周数：整行只有它，淡灰小字靠右 */
+  font-size:9px;font-style:normal;color:var(--faint);
+  align-self:center;justify-self:end;padding-right:5px;font-variant-numeric:tabular-nums;
+}
+.cald.is-blank,.cd.is-blank{visibility:hidden}
+.cald.is-has,.cd.is-has{font-weight:650}
+.cald.is-has::after,.cd.is-has::after{
+  content:"";position:absolute;left:50%;bottom:4px;width:3.5px;height:3.5px;margin-left:-1.75px;
+  border-radius:50%;background:var(--blue);
+}
+/* 今天：iOS 式红色实心圆只圈住公历数字，农历小字跟着染红 */
+.cald.is-today,.cd.is-today{background:none;color:var(--cal-red)}
+.cald.is-today b,.cd.is-today b{
+  background:var(--cal-red);color:#fff;font-weight:650;
+  width:25px;height:25px;border-radius:50%;display:grid;place-items:center;
+}
+.cald.is-today span,.cd.is-today span{color:var(--cal-red)}
+.cald.is-today::after,.cd.is-today::after{background:#fff;opacity:.95;bottom:3px}
+.cald.is-sel{box-shadow:inset 0 0 0 1.4px var(--ink)}
+.cald.is-today.is-sel{box-shadow:inset 0 0 0 1.4px var(--cal-red-soft)}
+.cd.is-sel{background:var(--ink);color:var(--bg);box-shadow:none;font-weight:600}   /* 抽屉：选中日反白 */
+.cd.is-sel b,.cd.is-sel span{color:var(--bg)}
+.cd.is-sel::after{background:var(--bg)}
+.cald.is-off,.cd.is-off{color:var(--faint);opacity:.55}
+.cald:active,.cd:active{transform:scale(.9)}
+
+/* 点某天之后：那天写了什么就地列在月历下方，不把人甩回列表 */
+.rc-day{margin-top:8px;border-top:1px solid var(--hair);padding-top:12px}
+.rc-day-h{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:0 2px 10px}
+.rc-day-h b{font-size:13.5px;font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
+.rc-day-h span{font-size:12px;color:var(--muted)}
+.rc-item{
+  background-color:var(--tile);background-image:var(--tile-shine);border-radius:var(--r-md);padding:12px 14px;margin-bottom:8px;
+  box-shadow:inset 0 0 0 .5px var(--tile-line),inset 0 1px 0 var(--tile-rim),var(--tile-sh);
+}
+.rc-item p{font-size:13.5px;line-height:1.66;color:var(--ink);white-space:pre-wrap;word-break:break-word}
+.rc-empty{font-size:12.5px;color:var(--muted);text-align:center;padding:10px 0 4px}
+.rc-go{
+  display:block;width:100%;margin-top:8px;height:40px;border-radius:var(--r-sm);
+  font-size:13px;font-weight:500;color:var(--blue);background:var(--blue-soft);
+  box-shadow:inset 0 0 0 .5px rgba(10,108,212,.20),inset 0 1px 0 var(--tile-rim);
+  transition:transform .22s var(--spring),background .2s var(--ease);
+}
+.rc-go:active{transform:scale(.98)}
+
+/* --- 年视图（#74 改 iOS 年历）：标题年份 + 12 个月宫格，每格一个迷你月历 ---
+   此前的 24 年选年宫格（.yhead/.ygrid/.ycell）已删 —— 跳年份靠 ‹‹ ›› 逐年翻。 */
+/* 头部：左边大年份、右边两行图例（红杠＝年份干支、灰杠＝农历小字）——
+   与 iOS 年历一致，也顺手把「小字是什么」讲清楚 */
+.ym-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:2px 2px 14px}
+.ym-year{
+  font-size:26px;font-weight:700;line-height:1.05;letter-spacing:.5px;
+  color:var(--cal-red);font-variant-numeric:tabular-nums;   /* iOS 年历：大年份是红的 */
+}
+.ym-legend{display:flex;flex-direction:column;gap:5px;flex:none;padding-top:6px}
+.ym-legend i{
+  display:flex;align-items:center;gap:6px;font-size:11px;font-style:normal;
+  color:var(--ink);white-space:nowrap;
+}
+.ym-legend i::before{content:"";width:14px;height:2px;border-radius:1px;background:var(--cal-red);flex:none}
+.ym-legend i.is-lunar{color:var(--muted)}
+.ym-legend i.is-lunar::before{background:var(--hair)}
+.ymgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px 12px;padding:2px 2px 10px}
+.ymon{
+  display:block;width:100%;border:0;padding:0;font:inherit;text-align:left;color:inherit;
+  transition:transform .22s var(--spring),opacity .2s;
+}
+.ymon:active{transform:scale(.94)}
+.ymon.is-off{opacity:.32}
+.ymon h4{font-size:13.5px;font-weight:600;margin:0 0 5px;color:var(--ink)}
+.ymon h4.is-cur{color:var(--cal-red)}
+.ymd{display:grid;grid-template-columns:repeat(7,1fr);gap:1px 0}
+.ymd i{height:16px}
+.ymd b{
+  position:relative;font-size:8.5px;font-weight:450;height:16px;line-height:12px;
+  display:flex;align-items:flex-start;justify-content:center;
+  color:var(--ink-2);font-variant-numeric:tabular-nums;border-radius:50%;
+}
+.ymd b.is-has{color:var(--cal-red);font-weight:700}
+.ymd b.is-has::after{
+  content:"";position:absolute;left:50%;bottom:0;width:3px;height:3px;margin-left:-1.5px;
+  border-radius:50%;background:var(--cal-red);
+}
+.ymd b.is-today{
+  background:var(--cal-red);color:#fff;width:15px;height:15px;line-height:15px;
+  align-items:center;justify-self:center;margin:0 auto;
+}
+.ymd b.is-today.is-has::after{background:#fff;bottom:1px}
+
+.tl{display:flex;flex-direction:column}
+.tl[hidden]{display:none}   /* 同 .rc-grid：自带 display 会盖掉 UA 的 [hidden] */
+
+/* ---- 封面卡（#161，用户 2026-10-09 定）----
+   这张卡现在铺的是**用户自己上传的图片**（原来那套程序生成的风景底图连同
+   大字「周五 25」、七天周条、右上圆钮一并去掉），框里只留左上角一行完整日期。
+   点卡片 = 换一张图（change 监听在 app.js，隐藏 input `heroPhoto`）。
+   · 空态（还没传过图）：浅色斜渐变打底 + 居中一句提示，走 .has-img 切换 ——
+     提示文案在 CSS 里（少一个 DOM 节点），不用 JS 改字。
+   · 日期读不读得清全看用户传了什么图 → 压一层从上的柔暗晕 + 文字阴影，
+     白字压在天空 / 白墙上也不至于化掉（原版靠日头与暗角，一并去掉了）。
+   · ⚠️ 别把 ::before 的暗晕写进 .tl-hero 本体：图片层 .tl-hero-img 是它的兄弟，
+     将来若加第三层，注释里这层雾要跟着挪。 */
+.tl-hero{
+  position:relative;height:212px;margin:2px 0 4px;border-radius:var(--r-lg);overflow:hidden;
+  background-color:var(--tile);background-image:var(--tile-shine);
+  box-shadow:inset 0 0 0 .5px var(--tile-line),inset 0 1px 0 var(--tile-rim),var(--tile-sh);
+  cursor:pointer;
+}
+.tl-hero[hidden]{display:none}
+.tl-hero-img{
+  position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;
+}
+/* 空态时 JS 给图片层挂 hidden（见 renderHero）—— 「没有 src 的 <img>」在部分内核上
+   会画一个破图图标，压在那行日期左边很难看。必须显式写 [hidden]{display:none}：
+   上面那条 display:block 会盖掉 UA 的 [hidden]（同 .tl / .rc-grid 那两处老坑）。 */
+.tl-hero-img[hidden]{display:none}
+body[data-theme="dark"] .tl-hero{box-shadow:inset 0 0 0 .5px rgba(255,255,255,.10)}
+
+/* 空态提示：只给还没传图的那张看 —— 传了图就把 .has-img 挂上，这句自动消失 */
+.tl-hero::after{
+  content:"点击添加封面图";position:absolute;z-index:1;
+  left:0;right:0;top:50%;transform:translateY(-50%);
+  text-align:center;font-size:13px;font-weight:500;color:var(--faint);letter-spacing:.4px;
+}
+.tl-hero.has-img::after{content:none}
+/* 有图才压的柔暗晕：给右上角那行白字垫底。空态没有白字，也就不需要 */
+.tl-hero.has-img::before{
+  content:"";position:absolute;z-index:1;left:0;right:0;top:0;height:64%;
+  background:linear-gradient(180deg,rgba(16,14,12,.40),rgba(16,14,12,0));
+}
+
+.tl-hero-top{
+  position:absolute;z-index:2;left:0;right:0;top:0;
+  display:flex;align-items:center;justify-content:flex-start;gap:10px;padding:14px 15px 0 18px;
+}
+.tl-hero-pill{
+  font-size:12.5px;font-weight:600;color:#fff;letter-spacing:.3px;
+  text-shadow:0 1px 7px rgba(0,0,0,.45);
+}
+/* 还没传图时白字压在浅色卡面上看不清 —— 空态下换个墨色（.has-img 由 JS 挂） */
+.tl-hero:not(.has-img) .tl-hero-pill{
+  color:var(--ink-2);text-shadow:none;
+}
+/* 「移除」只在有图时现身（空态下无图可移除，挂出来只是噪声）。
+   贴右上角：与左上角那行日期分居两头，谁也压不着谁。 */
+.tl-hero-del{
+  position:absolute;right:12px;top:12px;appearance:none;font:inherit;
+  padding:5px 11px;border-radius:999px;border:0;cursor:pointer;
+  font-size:11.5px;font-weight:600;color:#fff;letter-spacing:.3px;
+  background:rgba(20,18,16,.42);text-shadow:0 1px 4px rgba(0,0,0,.35);
+  transition:transform .18s var(--spring),background .18s var(--ease);
+}
+@media (hover:hover){.tl-hero-del:hover{background:rgba(20,18,16,.60)}}
+.tl-hero-del:active{transform:scale(.92)}
+.tl-hero:not(.has-img) .tl-hero-del{display:none}
+
+/* 日期分隔：一律写绝对日期（2026.09.17），不再用「今天 / 昨天 / 3 天前」——
+   相对说法会随时间漂移，也没法作为跳转落点。
+   #150 照日记视频改版：原来是「虚线圆点 + 日期 + 细横线」的时间线，视频里是
+   「粗体日期 + 灰星期」——圆点与横线整条去掉，日期加重。
+   ⚠️ .tl-day-txt 里**只能装日期本身**（verify_date / verify_recview 按它比对分组日期），
+   星期一律另起 .tl-day-wk。 */
+/* #152 照视频补的组间发丝线在 #201 退役：日期分组头现在自己是一块玻璃（长在
+   卡片头顶上 —— 参考图的样子），组与组之间靠 18px 的留白隔开。
+   ⚠️ .tl-day-txt 里**只能装日期本身**（verify_date / verify_recview 按它比对分组日期），
+   星期一律另起 .tl-day-wk。 */
+.tl-day{display:flex;align-items:baseline;gap:8px;margin:18px 0 0;padding:14px 16px 3px;
+        background-color:var(--tile);background-image:var(--tile-shine);
+        border-radius:var(--r-lg) var(--r-lg) 0 0;
+        box-shadow:inset 0 1px 0 var(--tile-rim),var(--tile-sh)}
+.tl-day:first-child{margin-top:6px}
+.tl-mon + .tl-day{margin-top:8px}
+.tl-day-txt{font-size:16px;font-weight:700;color:var(--ink);letter-spacing:-.2px;font-variant-numeric:tabular-nums}
+/* 日期与星期之间那颗小点（视频里是「22 September · Tuesday」）。
+   走 ::before 而不是塞进文本 —— .tl-day-wk 的文本被 verify_recview 正则在量，
+   CSS 生成的内容不进 textContent，两边都不受影响。 */
+.tl-day-wk{font-size:12.5px;color:var(--faint);font-weight:400;letter-spacing:.2px}
+.tl-day-wk::before{content:"·";margin-right:7px;color:var(--faint)}
+
+/* 月份标签（#152，照日记视频里 JULY 那种大字）：只在新月开头那一组上面出现一行。
+   **当月不给** —— 视频里最上面那组也只有「22 September」，没有 SEPTEMBER 标签，
+   而封面卡左上角本来就写着年月。写在 .tl-day 外面自成一行，别并进分组行：
+   .tl-day-txt 里只能装日期本身（verify_date / verify_recview 按它的文本比对分组日期）。 */
+.tl-mon{
+  margin:30px 0 0;padding:0 2px;
+  font-size:13px;font-weight:700;letter-spacing:1.6px;color:var(--muted);
+  font-variant-numeric:tabular-nums;
+}
+
+/* 跳转落点：日期下方一行淡橙底在 1.9s 内褪去（原来靠圆点补实提示） */
+.tl-day.is-focus{border-radius:var(--r-lg) var(--r-lg) 0 0;animation:tlFlash 1.9s var(--ease)}
+.tl-day.is-focus .tl-day-wk{color:var(--ink-2)}
+@keyframes tlFlash{
+  0%,55%{background-color:rgba(255,159,10,.16)}
+  100%{background-color:rgba(255,159,10,0)}
+}
+
+/* 条目（#201 照参考图重做）：每条日记是一块玻璃卡 —— 原来卡片壳在 #150 去掉过、
+   正文裸排在纸底上；参考图里每条都有自己的圆角玻璃底（微质感 = --tile 三件套），
+   日期分组头长在第一张卡的头顶上（.tl-day 铺同一块玻璃、只圆上缘，
+   紧跟的那张卡收掉上缘圆角，两截拼一张整卡）。 */
+.tl-item{margin-bottom:12px}
+.tl-card{position:relative;
+  background-color:var(--tile);background-image:var(--tile-shine);
+  border-radius:var(--r-lg);padding:12px 16px;
+  box-shadow:inset 0 0 0 .5px var(--tile-line),inset 0 1px 0 var(--tile-rim),var(--tile-sh)}
+/* 分组头正下方那张卡：头顶不留缝、上缘方角，跟 .tl-day 拼成一张整卡 */
+.tl-day + .tl-item{margin-top:0}
+.tl-day + .tl-item .tl-card{
+  border-top-left-radius:0;border-top-right-radius:0;
+  box-shadow:inset 0 0 0 .5px var(--tile-line),var(--tile-sh)}
+
+/* 卡片里不再有任何署名（头像 / 人名 / @handle / 书目），只留正文。
+   日期交由顶部 .tl-day 分组行，卡片内只在底部补一行淡色日期。
+
+   正文：折叠时只露前 3 行（-webkit-line-clamp），展开后类移除即恢复全文。
+   随笔不包「」——那是"摘录"的记号，这里记的是自己的想法。 */
+.tl-text{font-size:15px;line-height:1.8;color:var(--ink-2);letter-spacing:.2px;font-weight:400}
+.tl-text.is-clamped{
+  display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;
+}
+/* 展开时的逐词浮现（#150，照日记视频里那段文字动画）：展开那一下正文被拆成
+   一粒粒「词 / 字」，**原先被折叠藏住的那部分**依次淡入上浮，露出文字的过程
+   本身成了动效。延迟由 JS 按序号写进 style（18ms 一档、封顶 480ms），
+   CSS 只管这一条关键帧。粒度用 inline-block：中文逐字、西文整词，拆完的
+   行盒与原来一样会正常折行。 */
+.tl-text .rvw{display:inline-block;white-space:pre}
+.tl-text .rvw.is-in{animation:rvIn .46s var(--ease) both}
+@keyframes rvIn{from{opacity:0;transform:translateY(7px)}to{opacity:1;transform:none}}
+
+/* 展开 / 收起：正文正下方的淡色小字。短随笔在 renderRecord() 里被摘掉按钮。 */
+.tl-toggle{
+  margin-top:5px;font-size:11.5px;font-weight:500;color:var(--muted);letter-spacing:.2px;
+  transition:color .2s;
+}
+@media (hover:hover){.tl-toggle:hover{color:var(--ink-2)}}
+.tl-toggle:active{transform:scale(.96)}
+
+/* 底部一行：左日期、右删除。
+   删除只在展开态现身；但短随笔没有展开态（看不出溢出），
+   由 renderRecord() 给它加 .is-plain 让删除直接可见，否则它就删不掉了。 */
+.tl-foot{display:flex;align-items:center;justify-content:space-between;margin-top:11px}
+.tl-date{font-size:11px;color:var(--faint);font-variant-numeric:tabular-nums;font-weight:400}
+.tl-del{
+  font-size:11px;font-weight:500;color:#ff375f;letter-spacing:.2px;
+  opacity:0;pointer-events:none;transition:opacity .24s var(--ease);
+}
+.tl-card.is-open .tl-del,.tl-card.is-plain .tl-del{opacity:1;pointer-events:auto}
+.tl-del:active{transform:scale(.94)}
+
+/* 双指捏合的三档（#151，照日记视频）：0 摘要 = 每条约一行、1 标准 = 折叠三行、2 全文 = 全部摊开。
+   档位挂在 #timeline 的 data-tlzoom 上（默认没有这个属性 = 标准档，也就是老样子）。
+   摘要 / 全文两档都不给「展开 ▾」—— 视频里那两档就没有这条按钮，翻档本身才是入口。
+   （按钮的**存废**由 applyTlZoom 按「当前档位下溢不溢出」统一管；这里只管显隐。
+   删除按钮的显隐不在这儿补 —— 全文档每条都命中 .is-plain，遮不住。） */
+.tl[data-tlzoom="0"] .tl-text.is-clamped{-webkit-line-clamp:1}
+.tl[data-tlzoom="0"] .tl-toggle,.tl[data-tlzoom="2"] .tl-toggle{display:none}
+/* 摘要档是「一眼扫全月」的那档：删除按钮收掉 —— 视频里那档就是纯文本一列。
+   （原来这里连着收一块 118px 的配图块；配图位 #168 整体退役，那条选择器一并删掉。） */
+.tl[data-tlzoom="0"] .tl-del{display:none}
+/* 往回捏那一下：视口里的正文短淡一下再收（只动 opacity）—— 就地换档看着"跳"。
+   类由 applyTlZoom 加、animationend 摘（同一个类不摘干净就重播不了）。 */
+.tl-text.is-refold{animation:tlFold .24s var(--ease)}
+@keyframes tlFold{from{opacity:.34}to{opacity:1}}
+
+/* 配图位（`.tl-fig` 那块 118px 的渐变块）已整体退役 —— 用户 2026-10-09：
+   「我写的日记下面还带有封面呢」。正文够长就自动长出一块、还不能换成真图，
+   看着像一张空封面。日记列表现在只有「正文 + 底行」。别把这里加回来。 */
+
+.tl-empty{text-align:center;font-size:12px;color:var(--faint);padding:40px 0;font-weight:400}
+
+/* ---- 右下角悬浮加号：整段删除（#190 日记页那颗 / #191 书架与互动那两颗）----
+   旧址：`.fab`（58px 圆、right:18px、bottom:132px、z-index:35、`.is-on` 互斥点亮）。
+   ⚠️ 别再往右下角放浮层 —— 它**一定会**压住底下的内容，而且随着列表滚动，
+   压在谁身上是变的：#191 实测互动页滚到底时，最后一封信的「删除」正好落在加号底下
+   （带手势条的机型上 897/897 px² 全覆盖，点下去开的是写信面板）；
+   书架页在「最下一层也摆满」（≥216 本）时也会盖住整本书脊（1916/1916 px²）。
+   更要命的是**没有空间留给它**：底栏形象顶端距屏底 89px（真机 109px），
+   加号下沿在 132px —— 两者之间只剩 43px(真机 23px)，塞不下第二排按钮，
+   所以「往下挪」这条路是堵死的。
+   现在的口径：**新增入口一律在各自页头的右上角**（`.pg-add`）。判据见
+   `verify_books.py`（两处入口都在页头、且 DOM 里没有任何 `.fab`）。 */
+
+/* ---- 写一条：全屏书写页（#111，iOS 备忘录式） ----
+   原先是底部抽屉（#63 时代：框随内容长高、面板限高 92% 兜底）。#111 起铺满整屏：
+   顶栏（关闭 + 字数 + 保存）/ 日期行 / 折叠月历 / 一整块书写区 —— 输入框 flex:1
+   恒占剩余全部空间，长文在框内滚，不再有「长高把胶囊顶出屏」的问题。 */
+/* 写作面板跟随软键盘（--kb-inset 由 setupKeyboardInset 写入）：这条原来只挂在
+   html.is-native 下，iPhone Safari 里键盘弹出会盖住书写区下半截 —— 挪到基类，
+   桌面 / 无键盘环境恒 0，等于没动；原生壳行为不变。 */
+.tl-composer{position:absolute;inset:0;bottom:var(--kb-inset,0px);z-index:60;visibility:hidden}
+.tl-composer.is-open{visibility:visible}
+.tlc-scrim{position:absolute;inset:0;background:rgba(0,0,0,.32);opacity:0;transition:opacity .3s}
+.tl-composer.is-open .tlc-scrim{opacity:1}
+.tlc-panel{
+  /* #202：与写信面板（.sheet-body）同一套面容 —— 顶部留 7% 露出底下的页面与遮罩，
+     大圆角 + 顶缘 1px 受光线，顶上摆同一根灰拖条（#tlcGrab，下拖收起）。
+     #203：起点改 `--safe-top + 7%` —— 光一个 7% 在真机上是压在**状态栏 / 系统下拉
+     手势带**里的（900px 视口 7% = 63px，安全区 30~48px 时只剩十来像素余量）：用户
+     2026-10-12 报「日记那个页面的滑条太上了，容易跟手机里下拉菜单冲突」。安全区由
+     **起点**吃下（padding 里就不再重复让位）；网页版与探针 --safe-top 恒 0 → 逐像素同旧。 */
+  position:absolute;left:0;right:0;bottom:0;top:calc(var(--safe-top,0px) + 7%);
+  background:var(--pad-sheet);
+  border-top:1px solid var(--tile-rim);
+  border-radius:var(--r-lg) var(--r-lg) 0 0;
+  display:flex;flex-direction:column;gap:10px;
+  /* 安全区：底部仍让 --safe-bottom（原生壳注入，app.js applyShellInsets）；
+     网页版两值恒 0，padding 退化为 2/16/14。 */
+  padding:2px 16px calc(14px + var(--safe-bottom,0px));
+  transform:translateY(100%);transition:transform .42s var(--ease);
+  overflow:hidden;
+}
+.tl-composer.is-open .tlc-panel{transform:none}
+/* 下拖收起（#tlcGrab）：跟手期间停掉过渡 —— 与 .sheet-body.is-dragging 同一约定 */
+.tlc-panel.is-dragging{transition:none;-webkit-user-select:none;user-select:none}
+/* 灰条在书写面板里贴顶些：块高 19px 不变（热区），本体 top:10px 照旧 */
+.tlc-panel .sheet-grab{flex:none;margin-bottom:-4px;cursor:grab}
+/* 顶栏：返回（左）· 撤销/重做/完成（右）—— 备忘录同款（#114）。
+   图标全 ghost：无底色无描边，按下轻微缩放；完成键不加重，与参考图一致。 */
+.tlc-top{display:flex;align-items:center;justify-content:space-between;flex:none;padding:2px 2px 0}
+.tlc-acts{display:flex;align-items:center;gap:2px}
+.tlc-icon-btn{
+  flex:none;width:42px;height:42px;border-radius:var(--r-sm);
+  display:flex;align-items:center;justify-content:center;color:var(--ink);
+  transition:transform .16s var(--spring),opacity .18s;
+}
+.tlc-icon-btn:active{transform:scale(.9);opacity:.7}
+/* ---- 日期选择 ----
+   抽屉里唯一的「元信息」。原先这里还有一行「在读 · 书名」（.tlc-head / .tlc-book），
+   写日记本不该先做一道选题 —— 随笔不再挂书后，那一行连同样式一并删掉。
+   .tlc-date-lab 也去掉了：日期胶囊自己就是标签，不必再写一个「日期」。 */
+/* 元信息行（#114）：落款日期 · 字数 —— 备忘录同款的小灰字，替代原「日期胶囊」。
+   整行就是月历的开关：点它展开/收起补记月历，展开时点亮成主题蓝。 */
+.tlc-meta{
+  flex:none;display:flex;align-items:center;gap:7px;min-height:34px;padding:2px 2px;
+  font-size:12px;font-weight:400;font-variant-numeric:tabular-nums;color:var(--faint);
+  overflow:hidden;white-space:nowrap;transition:color .22s var(--ease);
+}
+.tlc-meta:active{color:var(--muted)}
+.tlc-meta.is-open{color:var(--blue)}
+.tlc-meta-sep{opacity:.55}
+
+/* 月历：max-height 折叠。展开上限按 6 行网格实算（表头 35 + 16 + 6×38 + 行距 12 ≈ 291），
+   留一点余量 —— 有的月份恰好排满 6 行，卡太紧会把最后一行裁掉。 */
+.tlc-cal{max-height:0;opacity:0;overflow:hidden;
+  transition:max-height .36s var(--ease),opacity .22s var(--ease)}
+.tlc-cal.is-open{max-height:300px;opacity:1}
+/* 年视图：12 个月宫格（4 行迷你月历 + 图例 ≈ 400px），抽屉自身可滚兜底 */
+.tlc-cal.is-open.is-ygrid{max-height:430px}
+.tlc-cal-head{display:flex;align-items:center;justify-content:space-between;padding:2px 2px 7px}
+.tlc-cal-title{
+  font-size:12.5px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:.2px;
+  padding:4px 9px;border-radius:var(--r-xs);transition:background .22s var(--ease),box-shadow .22s;
+}
+.tlc-cal-title:active{transform:scale(.96)}
+.tlc-cal-title.is-open{background:var(--blue-soft);box-shadow:inset 0 0 0 1px var(--blue);color:var(--blue)}
+.tlc-cal-nav{
+  width:26px;height:26px;border-radius:50%;font-size:15px;line-height:1;color:var(--ink);
+  background:var(--tile);box-shadow:inset 0 0 0 .5px var(--tile-line),inset 0 1px 0 var(--tile-rim);
+  transition:opacity .2s,transform .2s var(--spring);
+}
+.tlc-cal-nav.is-jump{font-size:16px;color:var(--muted)}
+.tlc-cal-nav:active{transform:scale(.9)}
+.tlc-cal-nav:disabled{opacity:.28}
+/* 写随笔抽屉里的年视图：与页面同款 12 月宫格，只是更紧凑 */
+.tlc-ygrid .ymgrid{gap:12px 9px;padding:2px 0 8px}
+.tlc-ygrid .ymon h4{font-size:12px;margin-bottom:3px}
+.tlc-ygrid .ymd i,.tlc-ygrid .ymd b{height:14px;line-height:10px;font-size:7.5px}
+.tlc-ygrid .ymd b.is-today{width:13px;height:13px;line-height:13px} /* 13×13 正圆；原先下面还有一条 width:11px 把它压成椭圆，v1.94 合并 */
+.tlc-ygrid .ym-year{font-size:21px}
+.tlc-ygrid .ym-legend i{font-size:10px}
+.tlc-ygrid .ym-legend{padding-bottom:7px;font-size:10px}
+.tlc-cal-grid{display:grid;grid-template-columns:18px repeat(7,1fr);gap:2px}
+.tlc-cal-grid .cw:first-child{visibility:hidden}
+/* 月历与年视图互斥：display:grid 会盖掉 UA 的 [hidden]{display:none}，得显式压回来 */
+.tlc-cal-grid[hidden],.tlc-ygrid[hidden]{display:none}
+/* #119：「写完 → 选日期」步骤的提示行（月历顶部一行小灰字）。年视图的图例
+   .calp-hint 一直裸着没有样式 —— 顺手同款，两处一起管。 */
+.tlc-cal .calp-hint{font-size:10.5px;color:var(--muted);padding:0 2px 6px}
+.tlc-cal-grid .cw{       /* 星期表头 */
+  height:16px;display:flex;align-items:center;justify-content:center;
+  font-size:9.5px;font-style:normal;color:var(--faint);letter-spacing:.3px;
+}
+.tlc-cal-grid .cd{       /* 日期格：两层（公历 + 农历小字），比页面月历紧凑 */
+  height:38px;border-radius:8px;
+}
+.tlc-cal-grid .cd b{font-size:11.5px}
+.tlc-cal-grid .cd span{font-size:7.5px;letter-spacing:.1px}
+.tlc-cal-grid .cd-wn{font-size:7.5px;padding-right:3px}
+.tlc-cal-grid .cd.is-today b{width:21px;height:21px}
+.tlc-cal-grid button.cd:active{transform:scale(.9)}
+
+/* #81：胶囊加一道 0.5px 内描边（iOS 系统色胶囊都有这层界定），颜色仍随 --blue。
+   筛选胶囊是交互件，按压给一次淡出反馈。 */
+.chip{font-size:10px;font-weight:600;color:var(--blue);background:var(--blue-soft);padding:3px 9px;border-radius:999px;
+  box-shadow:inset 0 0 0 .5px rgba(10,108,212,.20);
+  transition:opacity .18s var(--ease),transform .18s var(--spring);-webkit-tap-highlight-color:transparent}
+.chip:active{opacity:.6;transform:scale(.96)}
+.note-input{
+  resize:none;background:var(--tile);border-radius:var(--r-sm);padding:11px 12px;
+  box-shadow:inset 0 1px 0 var(--tile-rim);
+  font-size:12.5px;line-height:1.65;border:1px solid var(--tile-line);transition:border-color .25s;font-weight:400;
+}
+/* #111：全屏书写区 —— flex:1 吃掉顶栏/日期/月历之外的整块空间，长文在框内滚。
+   不再随内容长高（那套「写→读→写」的每键强制回流是打字卡顿的来源，已随 #111 移除），
+   overscroll-behavior:contain 断开滚动链：框内滚到底不再带着整页一起动。 */
+.tlc-panel .note-input{
+  flex:1;min-height:96px;
+  border:none;background:transparent;padding:8px 2px 4px;
+  font-size:14px;line-height:1.9;
+  overflow-y:auto;overscroll-behavior:contain;
+}
+.note-input:focus{border-color:var(--blue);background:var(--surface)}
+.note-input::placeholder{color:var(--faint)}
+.btn-primary{
+  background:var(--ink);color:var(--bg);border-radius:var(--r-xs);padding:9px 14px;font-size:12.5px;font-weight:600;flex:1;
+  transition:transform .18s var(--spring),opacity .2s;
+}
+.btn-primary:active{transform:scale(.95);opacity:.85}
+
+/* 旧「笔记卡片」一族（.note-list / .note-card / .note-top / .note-book / .note-page /
+   .note-pill / .note-text / .note-del / .note-foot / .note-time / .note-like）已随互动页
+   重做一并删除。时间线早在 #16 就换成了 .tl-* 卡片，这一族当时只剩互动页的「书页间的
+   声音」在用，而声音列表已被碑林取代。
+   注意 .note-input 不属于这一族 —— 它是撰写框，时间线抽屉与碑详情都还在用，别顺手删。 */
+
+
+/* #81：分组卡片补 iOS 的分层柔影（极淡），让卡片从纸底上"浮"起半级，
+   同时保留 hairline 描边 —— 只靠描边在深色下会糊成一片。 */
+.card{background-color:var(--tile);background-image:var(--tile-shine);border:1px solid var(--tile-line);border-radius:var(--r-md);padding:16px;margin-top:12px;
+  box-shadow:inset 0 1px 0 var(--tile-rim),var(--tile-sh)}
+/* .card-head 已删（v1.94）：零引用 */
+
+/* ===== 互动 · 写信与收信（#77） =====
+   老碑林（一人一碑 + 想你榜 + 「想你了」按钮）在 #77 整块拆掉了：互动页只剩两件事 ——
+   写信（右下角加号 → .cmp-* 面板）、收信（这一页的收件箱 .inbox-wrap）。
+   回信**不在本地生成**，由服务端产出后随下一次同步送达，所以收件箱天然存在
+   「已寄出 · 等待回信」这种中间态（.lb-wait），它不是异常，是等着的状态。
+
+   写信面板复用 .sheet 骨架（.sheet / .sheet-body / .sheet-grab / .sheet-close），
+   只是把内容换成「选人 + 输入框」，不再有自己的浮层样式；
+   背景模糊也不引入 —— backdrop-filter 是本项目帧率的主要成本（#12 / #21）。 */
+
+/* -- 收件箱 --
+   #181：整块与玻璃页头之间留 16px。页头自带 16px 下内边距（.pg-head 的 padding-bottom），
+   但那是给**文字**的 —— 页头的**视觉下沿**是那条玻璃带（box-shadow 的发丝线），
+   第一张卡正好压在那条线上，读起来像「卡片粘在页头底下」（用户 2026-10-10：
+   「图一图二的那些框，太贴近顶部了，像图三那样，有间隔的」）。
+   16px = 页头自己的下内边距口径，文字→卡片合计 32px，与「我的」页
+   （.me-hero 下内边距 30px + 6px）的观感对齐。
+   `.inbox-wrap` 上的 margin 会让**空态**也一起下移 16px，这正是要的。
+   （#205：原先这里还提了一句空态那只小家伙的摆位与 verify_pet163 的两条相对断言 ——
+   小家伙退役后那份几何断言也没了，空态只剩 `.lb-empty` 本身。） */
+.inbox-wrap{display:flex;flex-direction:column;margin-top:16px}
+.lb-item{
+  position:relative;padding:16px 16px 34px;margin-bottom:12px;
+  background-color:var(--tile);background-image:var(--tile-shine);border:1px solid var(--tile-line);border-radius:var(--r-lg);
+  box-shadow:inset 0 1px 0 var(--tile-rim),var(--tile-sh);
+}
+.lb-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:7px}
+.lb-to{
+  display:flex;align-items:center;gap:6px;min-width:0;
+  font-size:13.5px;font-weight:600;color:var(--ink);letter-spacing:-.2px;
+}
+.lb-date{font-size:11.5px;color:var(--muted);flex:none}
+/* 人物色小圆片：颜色由 JS 从所属书的书封色（c1）以 --fc 传进来，
+   于是「信 ↔ 书」在配色上绑定，不必为每个人物单独写一份样式。 */
+.lb-fig{
+  flex:none;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;
+  background:var(--fc);font-size:11px;line-height:1;
+}
+.lb-text{font-size:14px;line-height:1.68;color:var(--ink-2);white-space:pre-wrap;word-break:break-word}
+/* #201 照参考图：信自己写的那段是这张卡的「标题行」（大一号、加重、墨色）；
+   回信正文保持常规。两者共用 .lb-text（捏合翻档 / 展开动画同一套），用直接子元素
+   选择器区分 —— 别改成 class，探针按 .lb-text 量两种正文。 */
+.lb-item > .lb-text{font-size:15px;font-weight:600;color:var(--ink);line-height:1.7}
+/* 回信：一条细分隔线 + 标签，正文沿用 .lb-text */
+.lb-reply{margin-top:10px;padding-top:10px;border-top:1px solid var(--hair)}
+.lb-lab{
+  display:inline-block;margin-bottom:6px;
+  font-size:10px;font-weight:600;color:var(--blue);
+  background:var(--blue-soft);border-radius:999px;padding:3px 9px;
+}
+/* 等待回信：刻意做成一句平的、不抢眼的说明，不做成转圈动画 ——
+   回信本来就是"过一会儿才来"，转圈会让人以为卡住了。 */
+.lb-await{margin-top:10px;padding-top:8px;border-top:1px dashed var(--hair)}
+.lb-wait{
+  margin-top:2px;padding-top:0;border-top:none;text-align:center;
+  font-size:12px;line-height:1.6;color:var(--faint);font-weight:400;
+}
+
+/* ===== 等回信的小家伙：**#205 整体退役** =====
+   原先这里有宠物槽的定位、两个 <video> 的层叠、三个落点，以及「惊醒弹一下」的关键帧
+   —— 连同素材（6 段小家伙视频）与它的 JS 一起删了。互动页现在只有收件箱列表。
+   下面这条 .lb-reply.is-fresh 留着：它管的是「回信正文晚半拍淡进来」，
+   跟小家伙无关（由 freshReplies 那一点状态驱动，见 app.js）。 */
+/* 刚到的回信：正文晚半拍淡进来，读完这一屏就归位成普通回信 */
+.lb-reply.is-fresh .lb-text{animation:lbTextIn .5s var(--ease) .4s both}
+@keyframes lbTextIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+.lb-del{position:absolute;right:10px;bottom:8px;font-size:11.5px;color:var(--faint);padding:4px 8px;border-radius:9px}
+.lb-del:active{background:var(--fill)}
+.lb-empty{padding:38px 8px;text-align:center;font-size:13px;line-height:1.95;color:var(--muted)}
+
+/* -- 收件箱的两指捏合翻档（#198，与日记 #151 同一套）--
+   档位挂在 #inboxList 的 data-ltzoom 上（默认没有这个属性 = 标准档，也就是老样子）：
+   0 摘要 = 正文 / 回信各一行、删除收起；1 标准 = 夹三行 + 展开；2 全文 = 全摊开。
+   标准档的夹行（.lb-text.is-clamped 的 3 行）是**新增的老行为**：此前信件从来
+   不折叠，现在与日记对齐 —— 捏合本身才是「全文」的入口。
+   粒子浮现（.rvw）与收起的短淡入（is-refold）直接复用日记那对动画。 */
+.lb-text.is-clamped{
+  display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;
+}
+.lb-toggle{
+  margin-top:5px;font-size:11.5px;font-weight:500;color:var(--muted);letter-spacing:.2px;
+  transition:color .2s;
+}
+@media (hover:hover){.lb-toggle:hover{color:var(--ink-2)}}
+.lb-toggle:active{transform:scale(.96)}
+.lb-text .rvw{display:inline-block;white-space:pre}
+.lb-text .rvw.is-in{animation:rvIn .46s var(--ease) both}
+.lb-text.is-refold{animation:tlFold .24s var(--ease)}
+#inboxList[data-ltzoom="0"] .lb-text.is-clamped{-webkit-line-clamp:1}
+#inboxList[data-ltzoom="0"] .lb-toggle,#inboxList[data-ltzoom="2"] .lb-toggle{display:none}
+/* 摘要档是「一眼扫全部信」的那档：删除按钮收掉 —— 与日记摘要档同一条口径。 */
+#inboxList[data-ltzoom="0"] .lb-del{display:none}
+
+/* -- 写信面板 -- */
+.cmp-body{padding-top:4px}
+.cmp-sec{font-size:12px;color:var(--faint);letter-spacing:.06em;margin:18px 2px 9px}
+/* 名册是「一键就能写」的常用位（十几个人），换行铺开比横向滑动好点：一眼看全，不用猜右边还有没有。 */
+.cmp-who{display:flex;flex-wrap:wrap;gap:8px}
+.cmp-chip{
+  display:flex;align-items:center;gap:6px;padding:6px 12px 6px 6px;border-radius:999px;
+  border:1px solid var(--tile-line);background-color:var(--tile);background-image:var(--tile-shine);
+  box-shadow:inset 0 1px 0 var(--tile-rim);
+  font-size:12px;color:var(--ink-2);font-weight:400;
+  transition:border-color .22s var(--ease),background .22s var(--ease),transform .18s var(--spring);
+}
+.cmp-chip:active{transform:scale(.96)}
+.cmp-chip.is-on{border-color:var(--ink);background:var(--fill);color:var(--ink);font-weight:500}
+.cmp-emo{
+  flex:none;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;
+  background:var(--fc);font-size:12px;line-height:1;
+}
+.cmp-nm{white-space:nowrap}
+/* 名册之外的人：书名 + 人物名两个单行输入。
+   ⚠️ 单行 <input> 不豁免面板拖拽（#165）—— 起手点在输入框里时门槛抬到 14px，
+   所以这两栏**别改成 textarea**（多行会整条从拖拽里摘出去）。 */
+.cmp-custom{display:flex;align-items:center;gap:8px;margin-top:10px}
+.cmp-cs{
+  flex:1;min-width:0;background:var(--tile);border:1px solid var(--tile-line);border-radius:var(--r-sm);
+  box-shadow:inset 0 1px 0 var(--tile-rim);
+  padding:9px 12px;font-size:12.5px;color:var(--ink);font-family:inherit;transition:border-color .25s;
+}
+.cmp-cs:focus{border-color:var(--blue);background:var(--surface);outline:none}
+.cmp-cs::placeholder{color:var(--faint)}
+.cmp-mid{flex:none;font-size:12px;color:var(--faint)}
+.cmp-hint{font-size:11.5px;color:var(--faint);margin:7px 2px 0;line-height:1.6}
+.letter-box{display:flex;flex-direction:column;gap:8px}
+/* 撰写框：随笔那条「随内容长高」的规则这里不适用 —— 写信有 500 字上限，
+   固定一个够写的高度、超出在框内滚，比让它一路顶到面板底部更稳。 */
+.cmp-input{flex:none;height:132px;overflow-y:auto}
+.letter-foot{display:flex;align-items:center;gap:10px}
+.letter-count{font-size:10.5px;color:var(--faint);font-variant-numeric:tabular-nums;font-weight:400}
+.letter-count b{font-weight:500;color:var(--muted)}
+.cmp-send{flex:none;padding:9px 20px;border-radius:var(--r-sm)}
+
+/* ===== 书单 =====
+   #181：理由与 .inbox-wrap 同一条 —— 页头的视觉下沿是玻璃带那条发丝线，
+   「＋ 新建书单」原先正压在上面。16px 让首块（空态下它是唯一那块）离页头一个页头内边距。 */
+.list-wrap{display:flex;flex-direction:column;gap:12px;margin-top:16px}
+.list-card{
+  position:relative;border:1px solid var(--tile-line);border-radius:var(--r-lg);padding:20px;color:var(--ink);overflow:hidden;
+  background-color:var(--tile);background-image:var(--tile-shine);cursor:pointer;
+  box-shadow:inset 0 1px 0 var(--tile-rim),var(--tile-sh);
+  /* #178：长按卡片要弹出「删除书单」，先按住 450ms 的是手指、不是文字选择 ——
+     不关掉选中与 callout，Android WebView 会先弹系统菜单、我们的长按就收不到了。 */
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
+  transition:transform .34s var(--ease),box-shadow .34s var(--ease);
+}
+@media (hover:hover){.list-card:hover{transform:translateY(-2px);box-shadow:inset 0 1px 0 var(--tile-rim),var(--shadow-lift)}}
+/* #201 照参考图：右上角立着这册第一本书的封面色块（原来是三张叠着的书脊）。
+   渐变色由 JS 从书目 c1/c2 现场写进 style（空册给默认深蓝，见 renderLists）。 */
+.list-cov{
+  position:absolute;right:20px;top:20px;width:72px;height:96px;border-radius:var(--r-xs);
+  box-shadow:inset 0 0 0 .5px rgba(255,255,255,.18),0 6px 14px rgba(30,38,54,.22);
+}
+.list-cov::after{content:"";position:absolute;left:9px;top:0;bottom:0;width:1px;
+  background:rgba(255,255,255,.22)}                /* 书脊沟：立着的一本书 */
+.list-num{font-size:34px;font-weight:700;letter-spacing:-1px;line-height:1;color:var(--ink)}
+.list-num span{color:var(--muted)}
+.list-name{font-size:17px;font-weight:650;margin-top:7px;letter-spacing:-.3px}
+.list-desc{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.6;max-width:210px;font-weight:400}
+.list-open{
+  display:inline-flex;align-items:center;gap:5px;margin-top:14px;font-size:11.5px;font-weight:600;
+  color:var(--blue);background:var(--blue-soft);border-radius:999px;padding:6px 13px;
+}
+/* #178 长按书单卡片 → 卡片上浮出一枚**居中**的**玻璃**「删除书单」（用户 2026-10-10 定）。
+   为什么是长按而不是常驻：卡片右下已经有一颗「翻开书单 ▸」，再并排一枚红按钮会把每一次
+   翻书单都变成一次误删的风险；长按只在「想删它」时才用，露一次、点完（或点别处）就走。
+   玻璃与 .seg / .pg-add 同一套语汇：半透明底 + 0.5px 描边 + 顶缘内高光 + 柔影；
+   ⚠️ 红线：绝不 backdrop-filter（低端安卓浮层掉帧，见必读 §1.2）。
+   ⚠️ 长按会被系统的「选中文字 / 弹出菜单」抢（Android WebView 尤其明显），
+     故卡片自己关掉选中与 callout（见 .list-card 的 user-select 那一行）。 */
+.list-veil{
+  position:absolute;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;
+  /* 蒙层只用来「把底下这册压暗一档」—— 压太狠整张卡发灰（.34 试过），
+     卡片还是得认得出是哪一册；玻璃片自己另有描边 / 高光 / 柔影撑着。 */
+  background:rgba(24,24,26,.22);
+  opacity:0;pointer-events:none;transition:opacity .22s var(--ease);
+}
+.list-card.is-armed .list-veil{opacity:1;pointer-events:auto}
+.list-del{
+  font-family:inherit;font-size:13px;font-weight:650;letter-spacing:-.1px;cursor:pointer;
+  color:#ff375f;padding:10px 26px;border-radius:999px;border:none;
+  background-color:rgba(255,255,255,.78);
+  /* 斜向受光面（--pad-sheen 同一手法，只是这里压在玻璃片自身上）：
+     半透明底 + 这道高光 = 一眼看出是片玻璃，而不是一颗白胶囊。 */
+  background-image:linear-gradient(115deg,rgba(255,255,255,.60) 0%,rgba(255,255,255,.14) 34%,rgba(255,255,255,0) 58%);
+  box-shadow:inset 0 0 0 .5px rgba(0,0,0,.06),inset 0 1px 0 rgba(255,255,255,.95),0 10px 26px rgba(0,0,0,.22);
+  transition:transform .2s var(--spring);
+}
+/* 深色下白玻璃会晃眼、也压不住蒙层 —— 换成暗玻璃 tint，反光压细（同 --pad-glass 的口径） */
+body[data-theme="dark"] .list-del{
+  background-color:rgba(58,58,64,.80);
+  background-image:linear-gradient(115deg,rgba(255,255,255,.20) 0%,rgba(255,255,255,.05) 34%,rgba(255,255,255,0) 58%);
+  box-shadow:inset 0 0 0 .5px rgba(255,255,255,.14),inset 0 1px 0 rgba(255,255,255,.22),0 10px 26px rgba(0,0,0,.5);
+}
+.list-del:active{transform:scale(.95)}
+
+/* #200 长按书脊 → 书上方浮一枚**玻璃**「删除」（照 #178 书单同一套语汇与手势，2026-10-11 定）。
+   书脊只有二十来像素宽、柜体还 overflow:hidden —— 胶囊塞不进书脊里，挂在 .screen 层
+   由 JS 按书脊 rect 现场摆位（锚点 = 书脊中线、书顶上方 12px）；底色透明不蒙全屏，
+   收起判定全在 JS 的捕获监听里（点别处 / 点这本书自己都收）。
+   玻璃 = #178 同一款：半透明底 + 斜向受光高光 + 0.5px 描边 + 顶缘内高光 + 柔影；
+   ⚠️ 红线照旧：绝不 backdrop-filter（低端安卓浮层掉帧，见必读 §1.2）。 */
+.spine-pop{
+  position:fixed;z-index:44;left:0;top:0;
+  transform:translate(-50%,-100%);          /* 锚点在书顶上方，JS 只写 left/top */
+  opacity:0;pointer-events:none;transition:opacity .18s var(--ease);
+}
+.spine-pop.is-on{opacity:1;pointer-events:auto}
+.spine-pop.is-below{transform:translate(-50%,0)}   /* 顶行太贴页头时翻到书下方 */
+/* 小三角指向按住的那本：与胶囊同材质，转 45° 露一角 */
+.spine-pop::after{
+  content:"";position:absolute;left:50%;bottom:-3.5px;width:9px;height:9px;
+  transform:translateX(-50%) rotate(45deg);
+  background-color:rgba(255,255,255,.78);
+  box-shadow:inset 0 0 0 .5px rgba(0,0,0,.06);
+}
+.spine-pop.is-below::after{bottom:auto;top:-3.5px}
+.spine-del{
+  font-family:inherit;font-size:13px;font-weight:650;letter-spacing:-.1px;cursor:pointer;
+  color:#ff375f;padding:10px 26px;border-radius:999px;border:none;
+  background-color:rgba(255,255,255,.78);
+  background-image:linear-gradient(115deg,rgba(255,255,255,.60) 0%,rgba(255,255,255,.14) 34%,rgba(255,255,255,0) 58%);
+  box-shadow:inset 0 0 0 .5px rgba(0,0,0,.06),inset 0 1px 0 rgba(255,255,255,.95),0 10px 26px rgba(0,0,0,.22);
+  transition:transform .2s var(--spring);
+}
+body[data-theme="dark"] .spine-pop::after{
+  background-color:rgba(58,58,64,.80);
+  box-shadow:inset 0 0 0 .5px rgba(255,255,255,.14);
+}
+/* 深色下白玻璃会晃眼 —— 换暗玻璃 tint，反光压细（同 .list-del 深色口径） */
+body[data-theme="dark"] .spine-del{
+  background-color:rgba(58,58,64,.80);
+  background-image:linear-gradient(115deg,rgba(255,255,255,.20) 0%,rgba(255,255,255,.05) 34%,rgba(255,255,255,0) 58%);
+  box-shadow:inset 0 0 0 .5px rgba(255,255,255,.14),inset 0 1px 0 rgba(255,255,255,.22),0 10px 26px rgba(0,0,0,.5);
+}
+.spine-del:active{transform:scale(.95)}
+
+/* ---- #201 长按拖书（桌面图标同款）----
+   .drag-ghost  跟手的「拿起来的那本」：小书卡（书封渐变 + 书名），JS 只写 transform；
+   .drag-gap    落点预告缝：一道立在落点处的亮条，亮哪儿松手落哪儿；
+   .is-drag-src 原位的书压暗 —— 拖着的是幽灵，原位只是影子。 */
+.drag-ghost{
+  position:fixed;left:0;top:0;z-index:60;width:64px;height:88px;
+  display:grid;place-items:center;padding:0 6px;text-align:center;
+  border-radius:8px;color:#fff;font-size:10.5px;font-weight:600;line-height:1.35;
+  overflow:hidden;pointer-events:none;
+  box-shadow:inset 0 0 0 .5px rgba(255,255,255,.22),
+             inset 0 1px 0 rgba(255,255,255,.30),
+             0 14px 30px rgba(20,24,34,.38);
+  text-shadow:0 1px 2px rgba(0,0,0,.35);
+  will-change:transform;
+}
+.drag-gap{
+  position:absolute;left:0;top:0;width:3px;z-index:6;display:none;
+  border-radius:999px;background:rgba(255,255,255,.92);
+  box-shadow:0 0 0 .5px rgba(0,0,0,.12),0 2px 10px rgba(0,0,0,.30);
+  pointer-events:none;
+}
+.drag-gap.is-on{display:block}
+.spine.is-drag-src{opacity:.32;filter:saturate(.6)}
+
+/* 「新建书单」：空态下它是唯一的下一步，所以两种状态下都排在最前。
+   #201 照参考图整条是玻璃胶囊（不再虚线框）：＋ 号与字一排居中。 */
+.list-add{
+  display:flex;align-items:center;justify-content:center;gap:7px;
+  width:100%;padding:16px;border-radius:999px;cursor:pointer;font-family:inherit;
+  font-size:14px;font-weight:650;color:var(--ink);
+  background-color:var(--tile);background-image:var(--tile-shine);border:1px solid var(--tile-line);
+  box-shadow:inset 0 1px 0 var(--tile-rim),var(--tile-sh);
+  transition:transform .24s var(--ease),background .24s var(--ease);
+}
+@media (hover:hover){.list-add:hover{transform:translateY(-1px)}}
+.list-add-plus{font-size:15px;font-weight:600;line-height:1;color:var(--muted)}
+.list-empty{padding:34px 18px;text-align:center}
+.list-empty-t{font-size:14px;font-weight:650;color:var(--ink)}
+.list-empty-s{font-size:12px;color:var(--muted);line-height:1.75;margin:8px auto 0;max-width:250px}
+
+/* ===== 书单详情 / 往书单里加书（#57） ===== */
+.lsx-fields{padding:2px 20px 0}
+.lsx-name{
+  width:100%;border:none;background:transparent;outline:none;font-family:inherit;
+  font-size:21px;font-weight:700;letter-spacing:-.4px;color:var(--ink);padding:6px 0;
+}
+.lsx-desc{
+  width:100%;border:none;background:transparent;outline:none;font-family:inherit;
+  font-size:12.5px;color:var(--muted);padding:2px 0 6px;
+}
+.lsx-name::placeholder,.lsx-desc::placeholder{color:var(--muted);opacity:.65}
+.lsx-meta{font-size:11.5px;color:var(--muted);padding-bottom:2px}
+.lsx-acts{display:flex;gap:10px;padding:12px 20px 4px}
+.lsx-acts .bs-btn{flex:1}
+.lsx-list{padding:8px 20px 24px;display:flex;flex-direction:column;gap:8px}
+.lsx-row{
+  display:flex;align-items:center;gap:12px;padding:9px 10px;border-radius:var(--r-sm);
+  background:var(--tile);
+  box-shadow:inset 0 0 0 .5px var(--tile-line),inset 0 1px 0 var(--tile-rim);
+}
+/* 小封面缩略图：coverHTML 产出的 .cover-art 是 absolute + 内边距 14px，
+   缩到 34×46 会把里面的字挤爆 —— 这里只留渐变底与书脊，文字全隐。 */
+.lsx-cv,.lpk-cv{position:relative;flex:none;overflow:hidden;background:var(--tile);
+  border-radius:6px;box-shadow:0 2px 6px rgba(0,0,0,.12)}
+.lsx-cv{width:34px;height:46px}
+.lpk-cv{width:30px;height:41px}
+.lsx-cv .cover-art,.lpk-cv .cover-art{padding:0;border-radius:6px}
+.lsx-cv .cover-line,.lsx-cv .cover-title,.lsx-cv .cover-author,.lsx-cv .cover-tag,
+.lpk-cv .cover-line,.lpk-cv .cover-title,.lpk-cv .cover-author,.lpk-cv .cover-tag{display:none}
+.lsx-cv .cover-spine,.lpk-cv .cover-spine{width:2px}
+.lsx-info{flex:1;min-width:0}
+.lsx-bt{font-size:13px;font-weight:650;color:var(--ink);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lsx-ba{font-size:11px;color:var(--muted);margin-top:2px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lsx-x{
+  flex:none;width:26px;height:26px;border-radius:50%;border:none;cursor:pointer;
+  background:var(--tile);box-shadow:inset 0 0 0 .5px var(--tile-line);color:var(--muted);font-size:11px;line-height:1;
+  transition:transform .2s var(--ease);
+}
+.lsx-x:active{transform:scale(.9)}
+.lsx-none{font-size:12px;color:var(--muted);text-align:center;padding:22px 10px;line-height:1.75}
+
+.lpk-list{padding:6px 20px 16px;display:flex;flex-direction:column;gap:6px;
+  max-height:52vh;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.lpk-row{
+  display:flex;align-items:center;gap:11px;padding:8px 10px;border-radius:var(--r-sm);
+  background:var(--tile);
+  box-shadow:inset 0 0 0 .5px var(--tile-line),inset 0 1px 0 var(--tile-rim);
+  cursor:pointer;
+}
+.lpk-row input{flex:none;width:17px;height:17px;accent-color:var(--blue);margin:0}
+.lpk-info{flex:1;min-width:0;display:flex;flex-direction:column}
+.lpk-info b{font-size:13px;font-weight:650;color:var(--ink);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lpk-info i{font-style:normal;font-size:11px;color:var(--muted);margin-top:2px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* ---- 挑书层的「自定添加书籍」（#202）：书架上没有的书手填收进书单 ----
+   展开钮与 .lpk-row 同一材质（tile 底 + 发丝描边），表单复用 .bed-in，
+   确认键用实心墨色（与 .bed-btn.main 同一家，但这里独自成行）。 */
+.lpk-new{padding:10px 20px 0}
+.lpk-new-tog{
+  width:100%;border-radius:var(--r-sm);padding:11px 10px;font-size:13px;font-weight:600;
+  font-family:inherit;color:var(--ink);cursor:pointer;
+  background-color:var(--tile);background-image:var(--tile-shine);
+  box-shadow:inset 0 0 0 .5px var(--tile-line),inset 0 1px 0 var(--tile-rim);
+  transition:transform .2s var(--spring);
+}
+.lpk-new-tog:active{transform:scale(.98)}
+.lpk-new-form{display:none;margin-top:8px}
+.lpk-new-form.is-open{display:flex;flex-direction:column;gap:8px}
+.lpk-new-form .bed-in{margin-top:0}
+.lpk-new-go{
+  border-radius:var(--r-sm);padding:11px 0;font-size:13px;font-weight:600;font-family:inherit;
+  background:var(--ink);color:var(--bg);transition:transform .2s var(--spring);
+}
+.lpk-new-go:active{transform:scale(.97)}
+.lpk-new-hint{font-size:11px;line-height:1.5;color:var(--faint)}
+
+/* ===== 我的 · iOS 化 =====
+   沉浸纸感头部 + 阅读足迹（5 格）+ inset grouped 设置。骨架按 iOS 惯例做对：
+   卡片 10px 圆角、去投影只留 hairline、chevron #C7C7CC 细箭头、开关全 pill、
+   危险区红字行各自成卡。材质仍取封面三色（纸感渐变头部，见 --me-hero1/2）。
+   头部随内容滚走，**不再有接管它的吸顶标题栏** ——
+   #182：原先那条零高 sticky 的玻璃「我的」栏整条撤掉（用户 2026-10-10：「我的那个框就去掉」）。
+   它用的是 `--glass`，而本页底色是香槟金渐变（不是 --bg），于是那条玻璃在暖底上渲染成
+   **一块中性灰的横带**，两侧边界清楚 —— 正是用户看到的那只「框」。
+   撤掉后本页顶部只剩沉浸头部一路铺到页顶（`firstTop` 32 = `pageTop` 32，无缝）。
+   chips 画像标签经确认不做（不做替代行），总量计数由阅读足迹承担。 */
+/* 「我的」页底色（#132）：香槟金暖光 → 白。玻璃垫要有颜色可折才像（官方演示都放在
+   有颜色的底上），但色系统一就不杂；页面级一次性渐变，无运行时成本 */
+.page[data-page="me"]{
+  /* #185：本页顶边是沉浸头部（香槟金 = --me-hero1），一路铺到屏顶 —— 声明出来给原生
+     状态栏取色（app.js statusBarTopColor 读它）。不声明就落到主题底色 --bg，而这页顶上是
+     暖色：深色档实测状态栏 rgb(14,13,15) vs 页面 rgb(42,36,32)，浅色档 rgb(247,245,242)
+     vs rgb(245,239,225) —— 用户看到的就是「顶部跟我这个页面不一样」那条带子。
+     ⚠️ 只有「自己就是屏顶那块底色」的层才许声明（见 app.js 里那段约定）。 */
+  --sb-top:var(--me-hero1);
+  background:
+    radial-gradient(420px 300px at 18% -2%, rgba(255,183,105,.52), transparent 68%),
+    radial-gradient(380px 280px at 88% 10%, rgba(255,208,152,.34), transparent 70%),
+    linear-gradient(180deg,#f4ead8 0%,#f6f1e7 42%,#faf9f5 72%,#fdfdfc 100%);
+}
+/* #187：本页那张香槟金头部是**跟着滚**的 —— 它滚出屏顶之后，紧贴状态栏的变成**页面自己的底色**
+   （那层氛围光）。不跟着换的话，顶上就是一条浅色带子压在暖橙底上（用户：「往下滑的话，顶部那个条
+   看的好难受」）。这个值是量出来的：把页面内容藏掉、只留 .page 的底色，在屏顶那一行按 5 列取样取
+   平均（`_probe_sbbg187.py`，浅 rgb(247,219,184) / 深 rgb(38,28,16)）—— 底色是**不滚**的，所以
+   滚到哪儿它都一样，一个值就够。`.is-scrolled` 由 app.js 的 watchMeScroll() 挂/摘（带 8px 迟滞）。 */
+.page[data-page="me"].is-scrolled{ --sb-top:#f7dbb8; }
+body[data-theme="dark"] .page[data-page="me"].is-scrolled{ --sb-top:#261c10; }
+body[data-theme="dark"] .page[data-page="me"]{
+  background:
+    radial-gradient(420px 300px at 18% -2%, rgba(255,159,10,.18), transparent 68%),
+    radial-gradient(380px 280px at 88% 10%, rgba(255,190,120,.08), transparent 70%),
+    var(--bg);
+}
+.me-hero{
+  /* #182：上外边距由 -6px 改 0 —— 原先那个 -6px 是用来抵消 .page 的 6px 上内边距的
+     （沉浸头部要一路铺到页顶）；.page 的内边距现在归零，这里再往上一寸就会顶出页顶被裁掉。 */
+  margin:0 -20px 0;padding:calc(22px + var(--safe-top)) 20px 30px;text-align:center;cursor:pointer;
+  /* #132：末段改透明 —— 让页面级香槟金氛围光透上来，避免与页面底色出接缝 */
+  background:linear-gradient(172deg,var(--me-hero1) 0%,var(--me-hero2) 55%,transparent 100%);
+  transition:opacity .2s;
+}
+.me-hero:active{opacity:.66}
+.avatar{
+  width:52px;height:52px;border-radius:50%;margin:0 auto;display:grid;place-items:center;
+  font-size:19px;font-weight:600;color:var(--bg);
+  background:var(--ink);box-shadow:0 6px 16px rgba(0,0,0,.10);
+}
+.me-nick{font-size:20px;font-weight:650;letter-spacing:-.3px;margin-top:11px}
+.me-sig{margin-top:5px;font-size:12px;color:var(--muted);line-height:1.55;font-weight:400}
+body[data-theme="dark"] .me-hero .me-sig{color:#b4b4bc}
+.me-sub{margin-top:4px;font-size:12.5px;color:var(--muted);line-height:1.5;font-weight:400}
+/* 深色下头部透出的是暗底，--muted(#98989f) 对比不足 —— 与 .pg-head 同一处理，上提一档 */
+body[data-theme="dark"] .me-hero .me-sub{color:#b4b4bc}
+/* 编辑资料入口：右上角蓝字文本按钮 —— iOS 导航动作不做底座胶囊 */
+.me-edit{position:absolute;right:16px;top:calc(14px + var(--safe-top));font-size:13px;font-weight:500;color:var(--blue);z-index:2}
+.me-edit[hidden]{display:none}
+.me-edit:active{opacity:.5}
+/* 头像的照片形态：小图 JPEG dataURL 当背景铺满圆形（#122；边长 AVA_OUT，见 app.js） */
+.avatar.has-photo{background-size:cover;background-position:center;color:transparent}
+/* 编辑资料浮层：复用 .sheet 骨架，scrim 用 .plain（无模糊）。
+   面板本体玻璃化的规则在 .sheet-body 基础规则之后（同优先级靠后取胜）。 */
+.about-logo{display:flex;align-items:center;gap:14px;padding:14px 0 4px}
+.about-logo img{display:block}
+.about-logo h3{font-size:16px;font-weight:650;letter-spacing:-.2px}
+.about-logo p{font-size:12px;color:var(--muted);margin-top:3px;line-height:1.5}
+.about-ver{font-size:11px;color:var(--faint);padding:2px 0 8px;border-bottom:1px solid var(--hair)}
+.about-rows{padding:2px 0 0}
+.help-qa{padding:4px 0 10px;border-bottom:1px solid var(--hair)}
+.help-qa p{font-size:12.5px;color:var(--ink-2);line-height:1.65;margin:9px 0 0}
+.help-qa p b{color:var(--ink);font-weight:600}
+/* #201 照参考图整版重做：标题行与每一栏各是一块玻璃胶囊卡（大圆角、微质感），
+   栏内不再画下划线；「保存」是黑胶囊主按钮（--obd-solid，深色档自动翻近白）。 */
+.prof-head{
+  padding:16px 18px;border-radius:var(--r-lg);margin-top:36px;   /* 顶部留一条 ✕ 自己的通道，别压卡角 */
+  background-color:var(--tile);background-image:var(--tile-shine);
+  box-shadow:inset 0 0 0 .5px var(--tile-line),inset 0 1px 0 var(--tile-rim),var(--tile-sh);
+}
+.prof-head h3{font-size:19px;font-weight:700;letter-spacing:-.4px}
+.prof-avrow{
+  display:flex;align-items:center;gap:18px;padding:14px 18px;margin-top:10px;
+  border-radius:var(--r-lg);
+  background-color:var(--tile);background-image:var(--tile-shine);
+  box-shadow:inset 0 0 0 .5px var(--tile-line),inset 0 1px 0 var(--tile-rim),var(--tile-sh);
+}
+.prof-av{
+  width:72px;height:72px;border-radius:50%;flex:none;display:grid;place-items:center;
+  font-size:26px;font-weight:600;color:var(--bg);background:var(--ink);
+  background-size:cover;background-position:center;
+}
+.prof-av.has-photo{color:transparent}
+.prof-avacts{display:flex;flex-direction:column;gap:8px}
+.prof-act{font-size:13.5px;font-weight:500;color:var(--blue);text-align:left;padding:2px 0}
+.prof-act[hidden]{display:none}
+.prof-act:active{opacity:.5}
+/* .prof-emojis 已删（v1.94）：表情输入退役后零引用 */
+.prof-field{
+  display:flex;align-items:center;gap:12px;padding:14px 18px;margin-top:10px;
+  border-radius:var(--r-lg);
+  background-color:var(--tile);background-image:var(--tile-shine);
+  box-shadow:inset 0 0 0 .5px var(--tile-line),inset 0 1px 0 var(--tile-rim),var(--tile-sh);
+}
+.prof-field span{font-size:13px;color:var(--muted);flex:none}
+.prof-field input{flex:1;font-size:15px;color:var(--ink);font-weight:400;min-width:0}
+.prof-field.is-ro b{flex:1;font-size:14px;font-weight:400;color:var(--ink-2);min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prof-save{
+  margin-top:18px;height:52px;width:100%;border-radius:999px;
+  background:var(--obd-solid);color:var(--obd-solid-ink);font-size:15.5px;font-weight:600;
+  box-shadow:0 8px 20px rgba(30,38,54,.16);
+  transition:transform .2s var(--spring);
+}
+.prof-save:active{transform:scale(.98)}
+
+/* 数据带已在 #136 撤除 —— 四格计数并入 .me-foot（见下方「阅读足迹」）。 */
+
+/* 设置分组：iOS inset grouped —— 组标题小灰字不缩进，卡片不带投影靠灰底对比分层 */
+.me-gttl{font-size:12px;color:var(--muted);font-weight:400;padding:0 6px;margin:18px 0 7px}
+.me-card{
+  position:relative;background:var(--pad-glass);border:1px solid var(--pad-brd);border-radius:20px;overflow:hidden;
+  box-shadow:var(--pad-shadow),inset 0 1px 0 var(--pad-rim),inset 0 -1px 0 var(--pad-rim2),
+             inset 1px 0 0 var(--pad-rim2),inset -1px 0 0 var(--pad-rim2);
+}
+/* 玻璃受光面（#132）：斜向镜面高光。pointer-events:none，不拦行点击 */
+.me-fc::before,.me-card::before,.pillbtn::before{
+  content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  background:var(--pad-sheen);
+}
+.me-card .set-list{padding:2px 14px}
+/* 危险区：红字行各自成卡、无图标无箭头 —— 红色本身就是全部强调（iOS 惯例） */
+.me-card.is-danger{margin-top:10px}
+.set-list{display:flex;flex-direction:column}
+.set-row{
+  display:flex;align-items:center;gap:12px;padding:12px 0;font-size:14px;font-weight:400;
+  border-bottom:1px solid var(--hair);
+}
+.set-row:last-child{border-bottom:0}
+.set-ico{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:13px;color:#fff;flex:none}
+.set-lab{flex:1;font-weight:600;letter-spacing:-.1px}
+/* 值文字与箭头分层：值 #8E8E93（--muted），箭头 #C7C7CC 细箭头 —— 不再同色 */
+.set-val{font-size:12px;color:var(--muted);margin-right:2px;font-weight:400}
+.set-val.is-chev{font-size:16px;color:#c7c7cc;margin-right:0}
+.set-row.is-danger .set-lab{color:#ff375f;font-weight:500}
+.switch{width:42px;height:25px;border-radius:999px;background:var(--fill);position:relative;transition:background .3s var(--ease);flex:none}
+.switch::after{content:"";position:absolute;top:2.5px;left:2.5px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.18);transition:transform .3s var(--ease)}
+.switch.is-on{background:#34c759}
+.switch.is-on::after{transform:translateX(17px)}
+/* 更新卡（#132）：与设置分组同框，一并玻璃化（逻辑不动） */
+.page[data-page="me"] .upd-card{
+  border-radius:20px;background:var(--pad-glass);border-color:var(--pad-brd);
+  box-shadow:var(--pad-shadow),inset 0 1px 0 var(--pad-rim),inset 0 -1px 0 var(--pad-rim2),
+             inset 1px 0 0 var(--pad-rim2),inset -1px 0 0 var(--pad-rim2);
+}
+
+/* 阅读足迹（#136）：五格玻璃垫 —— 日记累计整行做头，四格计数 2×2。
+   原先另有一条独立的「数据带」（四格 .me-band/.me-cell），它的「本书」与足迹的
+   「在读+读完」是同一批书算两遍（用户点名重复）→ 四格并入此处，数据带整套删除。
+   上浮 12px 压住头部渐变收尾，与沉浸头部连成一体（原数据带的 -16px 由本组承接）。 */
+#meFoot{position:relative;z-index:2;margin:-12px 0 0}
+.me-foot{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.me-fc{
+  position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:2px;
+  padding:12px 16px 10px;border:1px solid var(--pad-brd);border-radius:16px;
+  background:var(--pad-glass);text-align:left;font-family:inherit;
+  box-shadow:var(--pad-shadow),inset 0 1px 0 var(--pad-rim),inset 0 -1px 0 var(--pad-rim2),
+             inset 1px 0 0 var(--pad-rim2),inset -1px 0 0 var(--pad-rim2);
+  transition:background .2s var(--ease);
+}
+.me-fc.is-wide{grid-column:1/-1;padding-bottom:12px}   /* 日记累计：整行，字数当头条 */
+.me-fc:active{background:var(--fill)}
+.me-fc b{font-size:22px;font-weight:750;letter-spacing:-.3px;color:var(--ink);line-height:1.1}
+.me-fc.is-wide b{font-size:26px;letter-spacing:-.5px}
+.me-fc b i{font-style:normal;font-size:11px;font-weight:500;color:var(--muted);margin-left:3px}
+.me-fc span{font-size:11px;color:var(--muted);font-weight:500}
+.me-fc .fdot{position:absolute;right:14px;top:14px;width:7px;height:7px;border-radius:50%}
+
+/* 快捷动作（#132）：玻璃胶囊 —— 推荐给朋友 / 帮助与反馈 */
+.pillbar{display:flex;gap:8px;margin-top:14px}
+.pillbtn{
+  position:relative;flex:1;height:54px;border-radius:999px;
+  background:var(--pad-pillbg);border:1px solid var(--pad-brd);
+  display:flex;align-items:center;gap:9px;padding:0 12px 0 8px;
+  box-shadow:var(--pad-shadow),inset 0 1px 0 var(--pad-rim),inset 0 -1px 0 var(--pad-rim2),
+             inset 1px 0 0 var(--pad-rim2),inset -1px 0 0 var(--pad-rim2);
+  transition:transform .2s var(--spring);
+}
+.pillbtn:active{transform:scale(.97)}
+.pill-ico{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:15px;font-weight:700;flex:none}
+.pill-ico.is-green{background:#34c759}
+.pill-ico.is-blue{background:var(--blue)}
+.pillbtn b{font-size:13.5px;font-weight:650;color:var(--ink);letter-spacing:-.1px;white-space:nowrap}
+
+/* ===== TabBar（#205：五个卡通形象 → 极简毛玻璃圆形框）=====
+   原先那 5 只 APNG 形象（连同 gen_tab_pets.py 的产出与它那三组定位/待机规则）
+   整体退役。现在每格是一枚 52px 的毛玻璃圆框，里头一枚 23px 的线性图标
+   （内联 SVG，零素材、零体积，也不再需要任何关键帧）。
+   玻璃三件套全部沿用应用既有的令牌，不引入新的硬编码色：
+     --tile 半透白底 + --tile-shine 三层受光面（竖直衰减＋左上冷光＋右下暖光）
+     + 14px 背景模糊 + --tile-line 描边 + 顶缘 --tile-rim 内高光 = 「微质感」的全部来源。
+   选中那枚翻成实心 --ink、图标取 --bg —— 深浅主题下这一对自动互为反色，无需另开变量。
+   底栏依旧**全透明覆盖式**：脱离 flex 流、绝对定位压在内容之上，页面内容从圆框背后滚过。 */
+.tabbar{
+  position:absolute;left:0;right:0;bottom:26px;z-index:30;
+  height:72px;display:flex;align-items:center;justify-content:center;gap:6px;
+  padding:0 16px;
+  background:transparent;
+  -webkit-backdrop-filter:none;backdrop-filter:none;
+  border-top:0;
+}
+.tab{
+  flex:1 1 0;min-width:0;display:flex;align-items:center;justify-content:center;
+  padding:0;background:none;color:inherit;
+}
+/* 毛玻璃圆框：底 + 受光面 + 背景模糊 + 描边 + 顶缘内高光 */
+.tab-orb{
+  width:52px;height:52px;border-radius:50%;
+  display:grid;place-items:center;color:var(--muted);
+  background-color:var(--tile);background-image:var(--tile-shine);
+  -webkit-backdrop-filter:blur(14px) saturate(160%);
+  backdrop-filter:blur(14px) saturate(160%);
+  border:1px solid var(--tile-line);
+  box-shadow:inset 0 1px 0 var(--tile-rim),0 2px 8px rgba(30,28,25,.06);
+  transition:transform .34s var(--spring),background-color .24s var(--ease),
+             color .24s var(--ease),box-shadow .24s var(--ease),border-color .24s var(--ease);
+}
+.tab-orb svg{width:23px;height:23px;display:block}
+.tab.is-on .tab-orb{
+  color:var(--bg);background-color:var(--ink);border-color:transparent;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.20),0 6px 16px rgba(30,28,25,.20);
+  transform:translateY(-3px);
+}
+.tab:active .tab-orb{transform:scale(.92)}
+.tab.is-on:active .tab-orb{transform:translateY(-3px) scale(.92)}
+
+/* 空 @media (prefers-reduced-motion) 已删（v1.94） */
+
+/* ===== 书籍详情 Sheet ===== */
+.sheet{position:absolute;inset:0;z-index:40;pointer-events:none}
+.sheet.is-open{pointer-events:auto}
+.sheet-scrim{
+  position:absolute;inset:0;background:rgba(0,0,0,.32);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);opacity:0;
+  transition:opacity .38s var(--ease);
+}
+.sheet.is-open .sheet-scrim{opacity:1}
+.sheet-body{
+  /* #203：与 .tlc-panel 同一口径 —— 起点吃 --safe-top，别落进状态栏 / 系统下拉手势带
+     （用户 2026-10-12：「日记那个页面的滑条太上了，容易跟手机里下拉菜单冲突」；
+     这一族面板顶上的灰条是同一根，八张底部面板一口气对齐）。
+     探针与网页版 --safe-top 恒 0 → 几何与改动前逐像素相同。 */
+  position:absolute;left:0;right:0;bottom:0;top:calc(var(--safe-top,0px) + 7%);
+  /* #180：面板底仍走 --pad-sheet（#134 用户定：底下页面整片透上来就是「过于透明」
+     —— 大面板必须压得住字），玻璃感交给**顶缘那道 1px 受光线 + 大面圆角**。 */
+  background:var(--pad-sheet);border-top:1px solid var(--tile-rim);
+  border-radius:var(--r-lg) var(--r-lg) 0 0;overflow-y:auto;
+  /* ⚠️ 收起态**不能**带这个向上阴影（#60）。面板 translateY(100%) 时整块停在屏幕
+     下方，而 `0 -10px 40px` 的阴影是朝上 40px 羽化的 —— 它会从屏底漏回屏幕内，
+     在底部压出一条全宽、向上渐隐的灰带（实测叠到 24% 暗）。书架 / 书单 / 互动
+     这些"看着底栏附近有点脏"的页面全是这条影子，跟内容无关。
+     改成只在打开态给阴影：收起时 none，开合都走 box-shadow 过渡，观感不变。 */
+  box-shadow:none;
+  transform:translateY(100%);transition:transform .52s var(--ease),box-shadow .52s var(--ease);padding:0 20px 30px;
+  /* 下拖收起（#134）：面板已滚到顶还继续下滑时，别把滚动链传给底下的页面 */
+  overscroll-behavior:contain;
+}
+.sheet.is-open .sheet-body{transform:translateY(0);box-shadow:0 -10px 40px rgba(0,0,0,.18)}
+/* 跟手态（#134）：位移由 JS 逐帧写内联 style，这里必须停掉 .52s 过渡，
+   否则面板追不上手指；松手后 JS 摘掉这个类，弹回 / 滑出才吃得到过渡。 */
+.sheet-body.is-dragging{transition:none;-webkit-user-select:none;user-select:none}
+/* #132：编辑资料 / 关于 / 帮助三张面板的覆盖 —— 必须排在本节基础规则之后（同优先级靠后取胜）。
+   ⚠️ 曾经写在文件前段（.prof-body 附近），被这里的 top:7% / background 反超：
+   about-body 的 top:auto 失效 → 面板被 max-height 截成 774px、收起时还留 63px 在屏内
+   （盖住 verify_bottom 的品红基准条，页面底部多出一条 --bg 色横带）。别挪回去。 */
+.prof-body,.about-body{
+  padding:0 20px 30px;
+  background:var(--pad-sheet);border-top:1px solid var(--pad-brd);
+}
+/* 关于/帮助是「随内容收缩」的底部面板：top:auto → 高度由内容定，收起时整体滑出屏外 */
+.about-body{top:auto;max-height:86%}
+/* #193 问题反馈：一张表单放进「关于/帮助」那张底部面板里。
+   ① 底/圆角/描边一律走 :root 的令牌（--tile* / --r-xs|sm），不写一次性色值；
+   ② 键盘保险：面板贴屏底（.sheet-body 的 bottom:0），原生壳若没按 adjustResize
+      收缩视口，输入框与「发送反馈」会被键盘盖住 —— 补一段 --kb-inset
+      （#184 给 .auth-panel 定过同款；resize 正常时它恒为 0，观感一格不动）；
+   ③ ⚠️ 必须排在上面的 .sheet-body / .prof-body,.about-body 之后（同优先级靠后取胜，#132 踩过）。 */
+.fb-body{bottom:var(--kb-inset,0px)}
+.fb-lab{margin-top:14px;font-size:11.5px;font-weight:600;color:var(--muted);letter-spacing:.2px}
+.fb-lab-row{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.fb-count{font-weight:400;color:var(--faint);font-variant-numeric:tabular-nums}
+.fb-text,.fb-mail{
+  display:block;width:100%;margin-top:8px;padding:11px 13px;border:0;border-radius:var(--r-sm);
+  background-color:var(--tile);background-image:var(--tile-shine);
+  box-shadow:inset 0 0 0 .5px var(--tile-line),inset 0 1px 0 var(--tile-rim);
+  font-family:inherit;font-size:14px;line-height:1.6;color:var(--ink);outline:none;
+  transition:background .22s var(--ease),box-shadow .26s var(--ease);
+}
+.fb-text{height:112px;resize:none}
+.fb-mail{height:44px;line-height:22px;font-size:15px}
+.fb-text::placeholder,.fb-mail::placeholder{color:var(--faint)}
+.fb-text:focus,.fb-mail:focus{background-color:var(--surface);box-shadow:inset 0 0 0 1.5px var(--blue)}
+/* 缩略图一排：74px 方图 + 虚线「加图片」。按压只动 transform（红线：低端机不上 filter） */
+.fb-pics{display:flex;flex-wrap:wrap;gap:9px;margin-top:9px}
+.fb-pic{
+  position:relative;width:74px;height:74px;border-radius:var(--r-xs);overflow:hidden;
+  background-color:var(--tile);box-shadow:inset 0 0 0 .5px var(--tile-line);
+}
+.fb-pic img{display:block;width:100%;height:100%;object-fit:cover}
+.fb-pic-del{
+  position:absolute;right:3px;top:3px;width:20px;height:20px;border-radius:50%;border:0;
+  background:rgba(20,20,22,.62);color:#fff;font-size:10px;line-height:1;
+  display:grid;place-items:center;transition:transform .16s var(--spring);
+}
+.fb-pic-del:active{transform:scale(.86)}
+.fb-add{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  width:74px;height:74px;border:1px dashed var(--tile-line);border-radius:var(--r-xs);
+  background-color:var(--tile);background-image:var(--tile-shine);
+  box-shadow:inset 0 1px 0 var(--tile-rim);
+  color:var(--muted);font-size:10.5px;transition:transform .16s var(--spring);
+}
+.fb-add span{font-size:18px;line-height:1;color:var(--blue)}
+.fb-add:active{transform:scale(.96)}
+.fb-err{margin-top:9px;font-size:12.5px;line-height:1.5;color:#ff375f}
+.fb-err:empty{display:none}
+.fb-send{
+  display:block;width:100%;height:46px;margin-top:14px;border:0;border-radius:var(--r-sm);
+  background:var(--blue);color:#fff;font-size:15px;font-weight:600;
+  transition:transform .16s var(--spring),opacity .22s var(--ease);
+}
+.fb-send:active:not(:disabled){transform:scale(.972)}
+.fb-send:disabled{opacity:.55}
+.fb-tip{margin:10px 0 0;font-size:11px;line-height:1.6;color:var(--faint);text-align:center}
+/* 灰条（#134）：视觉还是那根 36×5 的短棒（位置与原先逐像素一致：条顶 10px、
+   块高 19px），但热区放大到 120×19 —— 用户是按着它「往下拖」的，
+   条本体太窄，起手与按住都容易脱手。 */
+.sheet-grab{position:relative;width:120px;height:19px;margin:0 auto;cursor:grab}
+.sheet-grab::after{
+  content:"";position:absolute;left:50%;top:10px;width:36px;height:5px;margin-left:-18px;
+  border-radius:3px;background:var(--faint);opacity:.5;
+}
+.sheet-close{
+  position:absolute;right:18px;top:16px;width:28px;height:28px;border-radius:50%;
+  background:var(--tile);box-shadow:inset 0 0 0 .5px var(--tile-line),inset 0 1px 0 var(--tile-rim);
+  color:var(--muted);display:grid;place-items:center;font-size:12px;z-index:3;
+}
+.bs-hero{display:flex;gap:16px;padding:14px 0 4px}
+.bs-cover{width:108px;height:147px;border-radius:12px;flex:none;position:relative;overflow:hidden;box-shadow:0 2px 4px rgba(0,0,0,.10),0 14px 30px rgba(0,0,0,.16)}
+.bs-info{flex:1;padding-top:4px;min-width:0}
+.bs-title{font-size:19px;font-weight:700;letter-spacing:-.5px;line-height:1.25}
+.bs-author{font-size:12.5px;color:var(--muted);margin-top:5px;font-weight:400}
+.bs-rate{display:flex;gap:2px;margin-top:9px;color:#e8a33d;font-size:12px}
+.bs-num{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--muted);margin-top:10px;font-weight:400}
+.bs-num b{color:var(--ink);font-size:13.5px;font-weight:650}
+.bs-actions{display:flex;gap:9px;margin-top:18px}
+.bs-btn{
+  flex:1;border-radius:var(--r-sm);padding:11px 0;font-size:13px;font-weight:600;text-align:center;
+  background-color:var(--tile);background-image:var(--tile-shine);color:var(--ink);
+  box-shadow:inset 0 0 0 .5px var(--tile-line),inset 0 1px 0 var(--tile-rim);
+  transition:transform .2s var(--spring);
+}
+.bs-btn.main{background:var(--ink);color:var(--bg)}
+/* 破坏性操作（#62 书单「删除书单」）：与书籍详情页的 .bed-btn.danger 同一范式 ——
+   浅红底 + 红字。刻意不做成实心红：它和「加入书籍」并排，实心红会盖过主操作。 */
+.bs-btn.danger{background:rgba(255,55,95,.12);color:#ff375f}
+.bs-btn:active{transform:scale(.96)}
+/* 详情页的「阅读进度」圆环（.bs-ring-wrap / .ring*）与整块翻页阅读器
+   （.reader / .open-book / .leaf* / .pg-num|body|h|quote|list*|side-mark / .book-scene /
+   .book-thickness）连同粒子开场（.particles / .pt-*）一并删除 —— 阅迹是读书记录，
+   不是阅读器。早先 #57 遗留的 .bs-card / .bs-note-row / .bs-note-page / .bs-note-txt
+   也顺手清掉（HTML 与 JS 里都不再出现这些类名）。⚠️ 别加回。 */
+
+
+/* ===== Toast ===== */
+.toast{
+  position:absolute;left:50%;bottom:104px;transform:translate(-50%,20px);z-index:92;
+  /* v1.94：原 70 与 .auth-sheet 同值，被 DOM 顺序盖住 —— 登录层开着时 toast 看不见 */
+  background:rgba(29,29,31,.9);color:#fff;font-size:12px;padding:9px 16px;border-radius:999px;font-weight:400;
+  opacity:0;pointer-events:none;transition:opacity .34s var(--ease),transform .34s var(--ease);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);white-space:nowrap;
+}
+.toast.is-on{opacity:1;transform:translate(-50%,0)}
+
+/* ===== 启动页 =====
+   画面是一张**静止的封面** assets/cover.png（#49 起换掉了 boot.mp4 —— 源素材从
+   一支封面视频换成了一张静态封面图，视频那套起播 / 暂停处理已随之删净）。
+   三个刻意选择：
+   ① 封面块的底色与 --cover-bg 同值（暖米底 #e9dec6），所以块边缘与页面同色、看不到接缝；
+   ② 封面容器用 width:66% + padding-bottom:66% 撑正方形，**不用 aspect-ratio** ——
+      aspect-ratio 要 Chromium 88+，而 minSdk 26 覆盖到的老 WebView 可能更旧；
+   ③ 启动页恒为浅色，不跟深色主题走：它是软件封面，不是应用界面。 */
+.launch{
+  position:absolute;inset:0;z-index:90;background:var(--boot-bg);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:0;overflow:hidden;transition:opacity .7s var(--ease);
+  /* #185：封面层铺到屏顶（底色就是 --boot-bg），状态栏在开屏这段时间跟它同色 ——
+     与 syncLaunchStatusBar() 取的是同一个变量，两处不会打架。 */
+  --sb-top:var(--boot-bg);
+}
+.launch.is-gone{opacity:0;pointer-events:none}
+/* #68：封面层跟主题。底色统一走 --boot-bg（浅 = --cover-bg，深 = --bg）——
+   与系统开屏（#69 的 splashBackground / values-night）、#bootveil 同一来源，
+   深色主题冷启动从开屏到主界面全程同色无缝。 */
+body[data-theme="dark"] .launch-word{color:#f5f5f7}
+body[data-theme="dark"] .launch-sub{color:#98989f}
+body[data-theme="dark"] .launch-btn{background:#f5f5f7;color:#111114}
+/* #68：老用户冷启动的纯色遮罩 —— 跳过封面后先盖住主界面的排版栅格化，
+   两帧预热后才淡出，全程不露「界面还在成形」的一两帧。 */
+#bootveil{
+  position:absolute;inset:0;z-index:91;background:var(--boot-bg);
+  transition:opacity .45s var(--ease);pointer-events:none;
+}
+#bootveil[hidden]{display:none}
+#bootveil.is-gone{opacity:0}
+/* #205：启动页的入场动画整体退役 —— 封面缩放(coverIn)、文案淡入(wordIn)、
+   三个脉冲点(.launch-dots / dotPulse)与按钮辉光(getStarted) 全删，
+   连那三个点的 DOM 也一并去掉（它们只为动效存在）。现在首帧即定稿，
+   唯一的动效是跳出这一层的 .is-gone opacity 过渡。按钮的落定阴影写死在本体上，
+   免得删掉 getStarted 的 forwards 之后它变成没阴影的样子。 */
+.launch-art{position:relative;width:66%;padding-bottom:66%;flex:0 0 auto}
+.launch-cover{
+  position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block;
+  border-radius:24%;          /* 与封面纸块的圆角同比例，边缘不留方角 */
+}
+.launch-word{
+  position:relative;z-index:2;margin-top:24px;font-size:23px;font-weight:600;letter-spacing:8px;
+  color:#1d1d1f;text-indent:8px;
+}
+.launch-sub{
+  position:relative;z-index:2;margin-top:8px;font-size:10px;letter-spacing:4.5px;color:#9a9a9f;
+  text-indent:4.5px;font-weight:400;
+}
+.launch-btn{
+  position:relative;z-index:2;margin-top:30px;padding:12px 32px;border-radius:980px;
+  background:#1d1d1f;color:#fff;font-size:13.5px;font-weight:600;letter-spacing:.3px;
+  box-shadow:0 6px 18px rgba(29,29,31,.16);transition:transform .2s var(--spring);
+}
+.launch-btn:active{transform:scale(.95)}
+.launch-skip{
+  position:absolute;bottom:46px;z-index:2;font-size:11px;color:#a4a4a9;letter-spacing:1px;font-weight:400;
+}
+
+/* ===== 响应式：窄屏变全屏 App ===== */
+@media (max-width:900px){ .stage-side{display:none} }
+@media (max-width:520px), (max-height:880px) and (max-width:900px){
+  body{overflow:hidden}
+  .stage{padding:0;gap:0}
+  .device{width:100vw;height:100vh;height:100dvh;border:0;border-radius:0;box-shadow:none}
+  .device::after{display:none}
+  .screen{border-radius:0}
+  .statusbar{padding:8px 24px 0}
+  .homebar{height:14px;padding-bottom:4px}
+  .tabbar{bottom:14px}          /* 跟随 homebar 收窄 */
+  :root{--tab-inset:74px}
+  .launch-word{font-size:21px}
+  .launch-art{width:62%;padding-bottom:62%}
+}
+
+/* ===== 原生壳（Android / Capacitor）：运行时判定，不依赖屏宽 =====
+   html / body 上的 .is-native 由 app.js 在原生环境注入（见 setupNativeShell）。
+   两条原则：
+   ① **只隐藏、不删除** —— 自绘状态栏与 homebar 在网页版 / PWA / 单文件版里仍是机身观感的一部分，
+      删掉会连带破坏那三种形态，还会让 verify_tab_geom.py 的 rect 断言与 12 个待机关键帧定位失效；
+   ② **不看屏宽** —— 上面那条媒体查询只覆盖到 900px 宽，平板 / 折叠屏展开态 / 横屏会掉回
+      "带机身壳 + 桌面侧栏"的演示态，所以这里按运行时判定把全屏规则再写一遍。
+   安全区交给 .screen 的 padding：flex 列内容（.pages）被顶下来；绝对定位的子元素
+   （.tabbar / 写日记抽屉）依 padding box 定位，于是底栏与抽屉
+   自然落在手势条之上 —— 不必逐个元素去改数值。 */
+html.is-native body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+html.is-native input,html.is-native textarea{-webkit-user-select:text;user-select:text}
+/* #113：「写日记时复制不了」—— 全局禁选的祖先环境会让安卓 WebView 的长按选择
+   手柄不出 nose，textarea 单独放行不够稳。把「内容」整块放行：书写页整页、
+   日记卡片正文、日历视角正文都可选可复制；UI 外壳照旧禁选（App 手感不丢）。 */
+html.is-native .tlc-panel,
+html.is-native .tl-text,
+html.is-native .rc-item p{-webkit-user-select:text;user-select:text}
+html.is-native .stage{padding:0;gap:0}
+html.is-native .stage-side{display:none}
+html.is-native .device{width:100vw;height:100vh;border:0;border-radius:0;box-shadow:none}
+html.is-native .device::after{display:none}
+html.is-native .screen{border-radius:0}
+/* #188 贴边：安全区不再由 .screen 统一让位（那样页面底色也够不着屏顶），改由**各页头/沉浸头部自己**
+   在 padding-top 里补上 --safe-top —— 于是页面底色与页头玻璃一路铺到屏顶、内容从状态栏下面穿过去，
+   那一条「状态栏色带」就不存在了。⚠️ 这里是 #182「页头贴页顶」的同一套手法，只是把 6px 换成了 --safe-top。 */
+html.is-native .statusbar{display:none}
+html.is-native .homebar{display:none}
+html.is-native .tabbar{bottom:var(--safe-bottom)}
+/* 正文输入 16px —— 低于 16px 时 Android 会在聚焦时强制缩放页面 */
+html.is-native .tlc-panel .note-input{font-size:16px}
+/* 底栏已上移 safe-bottom，内容留白同步跟上（74px 是窄屏档的取值） */
+html.is-native{--tab-inset:calc(74px + var(--safe-bottom))}
+
+/* ===== iOS「添加到主屏幕」（standalone PWA）：运行时判定（setupStandalonePWA 落 .is-pwa）=====
+   与 .is-native 同一套「机身让位」：真状态栏 / 手势条在场，自绘的 9:41 与 homebar 退场；
+   --safe-* 由 setupWebInsets 从 env() 量出（Safari 正常开网页时恒 0，那个形态不落这类）。
+   ⚠️ 状态栏样式仍保持 index.html 里的 default：iOS 不给 JS 留接口，换 black-translucent
+   会把状态栏文字锁死成白色 —— 浅色主题的玻璃页头是浅底，白字就看不见了。 */
+html.is-pwa body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+html.is-pwa input,html.is-pwa textarea{-webkit-user-select:text;user-select:text}
+/* 与 is-native 同一张放行单（#113）：书写页 / 日记正文 / 日历视角正文可选可复制 */
+html.is-pwa .tlc-panel,
+html.is-pwa .tl-text,
+html.is-pwa .rc-item p{-webkit-user-select:text;user-select:text}
+html.is-pwa .stage{padding:0;gap:0}
+html.is-pwa .stage-side{display:none}
+html.is-pwa .device{width:100vw;height:100vh;height:100dvh;border:0;border-radius:0;box-shadow:none}
+html.is-pwa .device::after{display:none}
+html.is-pwa .screen{border-radius:0}
+html.is-pwa .statusbar{display:none}
+html.is-pwa .homebar{display:none}
+html.is-pwa .tabbar{bottom:var(--safe-bottom)}
+html.is-pwa{--tab-inset:calc(74px + var(--safe-bottom))}
+
+/* =========================================================
+   账号与云同步（#30）
+   浮层层级（从高到低，v1.94 按现状重写；返回键收层顺序见 closeTopOverlay()）：
+     toast 92 > 启动遮罩 90/91 > 合规页 86 > 确认弹窗 85 > 合并弹窗 80 >
+     裁剪台 78 > 头像面板 77 > 首启引导 76 > 保存抽屉 73 > 头像大图 72 >
+     登录 70 > 写随笔抽屉 60 > 九张 .sheet 40 > 底栏/页脚 30
+   （注：裁剪台 78 在头像面板 77 之上是刻意的 —— 拍照裁剪时先弃图再收面板。）
+   ========================================================= */
+
+/* 账号区：整块可点（未登录=去登录，已登录=同步状态，失败时点一下重试）。
+   iOS 化后并入上方 .me-hero（沉浸头部），此处不再有单独的 .me-id 样式。 */
+
+/* ---- 登录 / 注册 / 找回 ----
+   动效语言对齐 Flutter / Material Motion，四条：
+   ① 面罩先淡入，面板随后用 spring 从底部升起（两者错相，不是一起淡）
+   ② 面板内每一项按 DOM 顺序错相浮现（authIn + nth-child 的 animation-delay）
+   ③ 登录↔注册↔找回 切换时，字段靠 max-height 平滑展开/收起。
+      注意 hidden 属性**保留**（探针读它），只把 UA 的 [hidden]{display:none}
+      换成 [hidden]{display:block;max-height:0}，否则过渡永远不跑。
+   ④ 输入框聚焦、按钮按压都有回弹 */
+.auth-sheet{
+  position:absolute;inset:0;z-index:70;
+  visibility:hidden;opacity:0;pointer-events:none;
+  transition:opacity .24s var(--ease),visibility .24s;
+}
+.auth-sheet.is-open{visibility:visible;opacity:1;pointer-events:auto}
+.auth-mask{
+  position:absolute;inset:0;background:rgba(0,0,0,.34);
+  opacity:0;transition:opacity .26s var(--ease);
+}
+.auth-sheet.is-open .auth-mask{opacity:1}
+/* 登录门面片。底边距取「12 + 安全区 + 键盘」——
+   #184：原先只有 `12px + kb-inset`，**漏了 `--safe-bottom`**：带手势条的机型上这张面片的下沿
+   就压在系统手势区里（实测 safe-bottom 24 时离屏底恒 12px、Δ0）。房子的正确样板是同族的
+   `.ava-sheet`（`calc(10px + var(--safe-bottom) + var(--kb-inset,0px))`），这里照它补齐。 */
+.auth-panel{
+  position:absolute;left:12px;right:12px;bottom:calc(12px + var(--safe-bottom) + var(--kb-inset,0px));
+  background-color:var(--pane);background-image:var(--tile-shine);border:1px solid var(--pane-line);border-radius:var(--r-md);padding:24px 20px 18px;
+  box-shadow:inset 0 1px 0 var(--tile-rim),var(--pane-sh);
+  transform:translateY(30px) scale(.965);opacity:.5;
+  transition:transform .46s var(--spring),opacity .3s var(--ease),bottom .2s var(--ease);
+}
+.auth-sheet.is-open .auth-panel{transform:none;opacity:1}
+/* 关掉时走更短更直的曲线，收得干脆 */
+.auth-sheet:not(.is-open) .auth-panel{
+  transition:transform .24s var(--ease),opacity .18s var(--ease),bottom .2s var(--ease);
+}
+/* backwards 而非 both：动画结束后把样式交还给元素自己，
+   否则 .auth-submit:active 的 scale 会被 fill 状态压住、按压反馈失灵 */
+.auth-sheet.is-open .auth-panel > *{animation:authIn .46s var(--spring) backwards}
+.auth-sheet.is-open .auth-panel > *:nth-child(1){animation-delay:56ms}
+.auth-sheet.is-open .auth-panel > *:nth-child(2){animation-delay:84ms}
+.auth-sheet.is-open .auth-panel > *:nth-child(3){animation-delay:112ms}
+.auth-sheet.is-open .auth-panel > *:nth-child(4){animation-delay:140ms}
+.auth-sheet.is-open .auth-panel > *:nth-child(5){animation-delay:168ms}
+.auth-sheet.is-open .auth-panel > *:nth-child(6){animation-delay:196ms}
+.auth-sheet.is-open .auth-panel > *:nth-child(7){animation-delay:224ms}
+.auth-sheet.is-open .auth-panel > *:nth-child(8){animation-delay:246ms}
+.auth-sheet.is-open .auth-panel > *:nth-child(9){animation-delay:258ms}
+.auth-sheet.is-open .auth-panel > *:nth-child(10){animation-delay:270ms}
+.auth-sheet.is-open .auth-panel > *:nth-child(11){animation-delay:282ms}
+@keyframes authIn{
+  from{opacity:0;transform:translateY(10px)}
+  to{opacity:1;transform:none}
+}
+.auth-close{
+  position:absolute;right:12px;top:12px;width:28px;height:28px;border-radius:50%;
+  background:var(--tile);box-shadow:inset 0 0 0 .5px var(--tile-line),inset 0 1px 0 var(--tile-rim);
+  color:var(--muted);font-size:12px;display:grid;place-items:center;
+  transition:background .2s var(--ease),transform .18s var(--spring);
+}
+.auth-close:active{transform:scale(.88)}
+.auth-title{font-size:20px;font-weight:600;letter-spacing:-.5px}
+.auth-sub{margin-top:6px;font-size:12.5px;line-height:1.62;color:var(--muted);padding-right:26px}
+/* 字段显隐走 max-height：撑开时 56px（input 44 + 余量），收起时 0 */
+.auth-field{
+  margin-top:10px;max-height:56px;overflow:hidden;
+  transition:max-height .34s var(--ease),opacity .24s var(--ease),
+             margin-top .34s var(--ease),transform .34s var(--ease);
+}
+.auth-field[hidden]{
+  display:block;margin-top:0;max-height:0;opacity:0;
+  transform:translateY(-6px);pointer-events:none;
+}
+.auth-field input{
+  width:100%;height:44px;padding:0 14px;border-radius:var(--r-sm);
+  background:var(--tile);box-shadow:inset 0 0 0 .5px var(--tile-line),inset 0 1px 0 var(--tile-rim);
+  font-size:16px;color:var(--ink);outline:none;
+  transition:background .22s var(--ease),box-shadow .26s var(--ease);
+}
+.auth-field input::placeholder{color:var(--faint)}
+/* 聚焦用 inset 描边而非外发光：父级 overflow:hidden 会把外侧阴影裁掉 */
+.auth-field input:focus{background:var(--surface);box-shadow:inset 0 0 0 1.5px var(--blue)}
+.auth-err{margin-top:9px;font-size:12.5px;line-height:1.5;color:#ff375f}
+.auth-ok{
+  display:none;margin-top:10px;padding:11px 12px;border-radius:12px;
+  background:var(--blue-soft);font-size:12.5px;line-height:1.72;color:var(--ink);
+  word-break:break-all;
+}
+.auth-ok.is-on{display:block}
+.auth-ok b{font-weight:600;letter-spacing:.4px}
+.auth-submit{
+  width:100%;height:46px;margin-top:14px;border-radius:var(--r-sm);
+  background:var(--blue);color:#fff;font-size:15px;font-weight:600;
+  transition:transform .16s var(--spring),background .22s var(--ease),opacity .22s var(--ease);
+}
+.auth-submit:active:not(:disabled){transform:scale(.972)}
+.auth-submit:disabled{opacity:.55}
+/* 本机免密（#171）：浮层顶上那条「一键进入」。收放走 max-height（与 .auth-field 同一套
+   语言：撑开 96px = 按钮 46 + 邮箱行 + 余量，收起 0），突然 display:none 会咯噔一下。 */
+.auth-dev{
+  margin-top:12px;max-height:96px;overflow:hidden;
+  transition:max-height .34s var(--ease),opacity .24s var(--ease),
+             margin-top .34s var(--ease),transform .34s var(--ease);
+}
+.auth-dev[hidden]{
+  display:block;margin-top:0;max-height:0;opacity:0;
+  transform:translateY(-6px);pointer-events:none;
+}
+.auth-devbtn{
+  width:100%;height:46px;border-radius:var(--r-sm);
+  background:var(--tile);box-shadow:inset 0 0 0 .5px var(--tile-line),inset 0 1px 0 var(--tile-rim);
+  color:var(--ink);font-size:15px;font-weight:600;
+  transition:transform .16s var(--spring),background .22s var(--ease),opacity .22s var(--ease);
+}
+.auth-devbtn:active:not(:disabled){transform:scale(.972)}
+.auth-devbtn:disabled{opacity:.55}
+.auth-devmail{margin-top:8px;text-align:center;font-size:12px;color:var(--muted)}
+/* gap 归零、间距交给 .auth-link 自己的 margin-top：
+   隐藏项才能把间距一并收掉，不留空档 */
+.auth-links{margin-top:12px;display:flex;flex-direction:column;align-items:center}
+.auth-link{
+  margin-top:9px;max-height:26px;overflow:hidden;
+  font-size:12.5px;color:var(--blue);
+  transition:max-height .3s var(--ease),opacity .22s var(--ease),
+             margin-top .3s var(--ease),transform .3s var(--ease);
+}
+.auth-link[hidden]{
+  display:block;margin-top:0;max-height:0;opacity:0;
+  transform:translateY(-4px);pointer-events:none;
+}
+.auth-link:active{opacity:.55}
+
+/* ---- 首启引导（#130）：登录门 → 恢复码 → 欢迎 → 称呼 → 头像 → 就绪 ----
+   全屏层（z 76）。玻璃质感 = 半透明底 + 描边 + 高光 + 柔影（红线：浮层
+   禁 backdrop-filter）；动效只动 transform / opacity，切步走 --spring。 */
+.obd{
+  position:absolute;inset:0;z-index:76;background:var(--bg);
+  /* #185：引导层铺满整屏、自己就是 --bg —— 它开着时顶边不是下面那一页的色。
+     不声明的话，在「我的」页上开引导会把状态栏留在香槟金上（那是页面的色，不是它的）。 */
+  --sb-top:var(--bg);
+  visibility:hidden;opacity:0;pointer-events:none;
+  transition:opacity .28s var(--ease),visibility .28s;
+  overflow:hidden;
+}
+.obd.is-open{visibility:visible;opacity:1;pointer-events:auto}
+/* 氛围壁纸：三层径向晕（右上蓝 → 左中橙 → 底部紫）铺在 --bg 之上，纯静态绘制、
+   不参与合成层动画。它是玻璃的「折射对象」——没有它，半透明控件就只是灰方块。
+   ⚠️ inset 必须留在 0：原先那层写过 -20%，百分比的圆心就跟着偏出去，晕全跑到屏外了。 */
+.obd-glow{
+  position:absolute;inset:0;pointer-events:none;
+  background:
+    radial-gradient(58% 34% at 82% 2%,var(--obd-amb1),transparent 70%),
+    radial-gradient(52% 30% at 4% 30%,var(--obd-amb2),transparent 68%),
+    radial-gradient(72% 40% at 46% 104%,var(--obd-amb3),transparent 72%);
+}
+/* 六步叠放。基础态 = 待场（右侧屏外）；.off-l = 已退场（左侧）；
+   .is-on = 在场。切换只改类，transition 负责滑动 —— 高帧率的关键是
+   全程没有 width/height/top 参与布局动画。 */
+.obd-step{
+  position:absolute;inset:0;display:flex;flex-direction:column;
+  padding:calc(var(--safe-top) + 18px) 26px calc(var(--safe-bottom) + 22px);
+  opacity:0;transform:translateX(30px);pointer-events:none;
+  transition:transform .46s var(--spring),opacity .3s var(--ease);
+}
+.obd-step.off-l{transform:translateX(-30px)}
+.obd-step.is-on{opacity:1;transform:none;pointer-events:auto}
+.obd-col{
+  flex:1;display:flex;flex-direction:column;min-height:0;
+  max-width:420px;width:100%;margin:0 auto;position:relative;z-index:1;
+}
+/* 入场错相：与 authIn 同语言，随 .is-on 重挂而重放 */
+@keyframes obdIn{
+  from{opacity:0;transform:translateY(14px)}
+  to{opacity:1;transform:none}
+}
+.obd-step.is-on .obd-anim{animation:obdIn .5s var(--spring) backwards}
+.obd-step.is-on .obd-anim:nth-child(2){animation-delay:56ms}
+.obd-step.is-on .obd-anim:nth-child(3){animation-delay:96ms}
+.obd-step.is-on .obd-anim:nth-child(4){animation-delay:136ms}
+.obd-step.is-on .obd-anim:nth-child(5){animation-delay:176ms}
+.obd-step.is-on .obd-anim:nth-child(6){animation-delay:216ms}
+.obd-step.is-on .obd-anim:nth-child(7){animation-delay:256ms}
+/* 品牌标（#169）：原先是衬线「阅」字，用户要求换成图标 —— 直接用应用自己的
+   图标 cover.png（白卡 + 灰线书页脸，角是烘进 PNG 的圆角、四角透明）。
+   ⚠️ 别再给 box-shadow：方影会在透明四角露出来；要投影只能走 drop-shadow
+   （跟着 alpha 走）。也别加 border-radius —— 切得比 PNG 自带圆角大就会削掉白卡。 */
+.obd-brand{
+  width:68px;height:68px;margin:2vh 0 22px;
+  display:block;
+  filter:drop-shadow(0 6px 16px rgba(30,28,25,.18));
+}
+.obd-h{font-size:26px;font-weight:800;letter-spacing:-.4px;line-height:1.32}
+.obd-sub{margin-top:8px;font-size:13.5px;line-height:1.6;color:var(--muted)}
+/* 登录门的字段：label 浮在上面 + 描边玻璃输入框（参考案例的结构，
+   配色跟主题走）；聚焦 = 内描边蓝圈（父级裁切安全，不用外发光） */
+.obd-field{display:block;margin-top:16px}
+/* display 会盖掉 UA 的 [hidden]{display:none}（§1.2 老坑）：邀请码 / 恢复码
+   两个字段靠 hidden 切换，必须显式写回 */
+.obd-field[hidden]{display:none}
+.obd-field span{display:block;font-size:12.5px;font-weight:600;color:var(--ink-2);margin-bottom:7px}
+/* 玻璃输入框（#169）：半透明白 + 1px 细线 + 顶缘内高光 + 柔影 = iOS 磨砂片。
+   ⚠️ 描边用**深线**（浅底上白描边等于没画）；聚焦时换成实心 --surface 再套蓝圈 ——
+   玻璃底在大字号下够读，但打字时给死底最稳（也避开自动填充黄底与半透明叠加的脏边）。 */
+.obd-field input{
+  width:100%;height:48px;padding:0 15px;border-radius:16px;
+  background:var(--obd-glass);border:1px solid var(--obd-glass-line);
+  box-shadow:inset 0 1px 0 var(--obd-glass-rim),var(--obd-glass-sh);
+  font-size:16px;color:var(--ink);caret-color:var(--blue);
+  transition:background .22s var(--ease),box-shadow .22s var(--ease),border-color .22s var(--ease);
+}
+.obd-field input:focus{
+  outline:none;background:var(--surface);border-color:transparent;
+  box-shadow:inset 0 0 0 1.6px var(--blue);
+}
+.obd-field input::placeholder{color:var(--faint)}
+.obd-err{margin-top:10px;min-height:19px;font-size:12.5px;line-height:1.5;color:#ff375f}
+/* 主按钮（#169）：蓝 → 黑（用户定的）。近黑实心 + 顶缘内高光 + 厚柔影，
+   在玻璃片里读作 iOS 的「实心胶囊」。禁用态那条不变（--fill 灰）。 */
+.obd-btn{
+  height:50px;margin-top:14px;border-radius:999px;flex:none;
+  background:var(--obd-solid);color:var(--obd-solid-ink);
+  box-shadow:inset 0 1px 0 var(--obd-solid-rim),var(--obd-solid-sh);
+  font-size:15.5px;font-weight:700;
+  transition:transform .16s var(--spring),opacity .22s var(--ease),background .22s var(--ease);
+}
+.obd-btn:active:not(:disabled){transform:scale(.965)}
+.obd-btn:disabled{background:var(--fill);color:var(--muted);box-shadow:none;pointer-events:none}
+/* 本机免密（#171）：登录步顶上的「一键进入」。只在"这台设备还留着凭据"时出现。
+   ⚠️ [hidden] 必须显式写 —— 下面那条 .obd-dev 的 display 会盖掉 UA 的 [hidden]{display:none}，
+      写了才会真藏起来（#168 那种"藏不住"的坑）。 */
+.obd-dev[hidden]{display:none}
+/* align-items 必须是 stretch：写 center 会让「一键进入」缩成一颗小胶囊（出图核对逮到的） */
+.obd-dev{margin-top:16px;display:flex;flex-direction:column;width:100%}
+.obd-devbtn{margin-top:0}
+/* 一键进入才是主按钮，密码那条路降级成玻璃次要按钮。
+   走 box-shadow 画描边而不是 border —— 50px 高、25px 圆角的按钮加 border 会顶高 2px。 */
+.obd-btn.is-alt{
+  background:var(--obd-glass);color:var(--ink);
+  box-shadow:inset 0 0 0 1px var(--obd-glass-line),inset 0 1px 0 var(--obd-glass-rim),var(--obd-glass-sh);
+}
+.obd-devmail{margin-top:8px;text-align:center;font-size:12.5px;color:var(--muted)}
+.obd-devsep{margin-top:16px;width:100%;display:flex;align-items:center;gap:10px;font-size:11.5px;color:var(--faint)}
+.obd-devsep i{flex:1;height:1px;background:var(--hair)}
+.obd-links{margin-top:14px;display:flex;flex-direction:column;align-items:center}
+.obd-link{margin-top:9px;font-size:13px;color:var(--blue)}
+.obd-link:active{opacity:.55}
+.obd-tiny{margin-top:auto;padding-top:16px;text-align:center;font-size:11.5px;line-height:1.6;color:var(--faint)}
+.obd-tinylink{font-size:11.5px;color:var(--blue)}
+/* 顶部导航行：返回 ‹ / 跳过 */
+.obd-nav{display:flex;align-items:center;justify-content:space-between;min-height:36px;margin:-2px 0 6px}
+.obd-back{width:36px;height:36px;margin-left:-8px;border-radius:50%;font-size:22px;line-height:1;color:var(--ink-2);display:grid;place-items:center}
+.obd-back:active{opacity:.55;transform:scale(.94)}
+.obd-skip{font-size:13.5px;font-weight:600;color:var(--muted);padding:6px 2px}
+.obd-skip:active{opacity:.55}
+/* 恢复码卡 */
+.obd-rccard{
+  margin-top:26px;padding:22px 18px;border-radius:var(--r-md);text-align:center;
+  background:var(--blue-soft);border:1px solid var(--stroke);
+}
+.obd-rccard b{font-size:20px;font-weight:700;letter-spacing:1px;word-break:break-all;color:var(--ink)}
+/* 欢迎页的艺术区：光斑圆 + 漂浮点（纯静态绘制） */
+.obd-art{position:relative;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:0}
+.obd-mark{
+  width:112px;height:112px;border-radius:50%;display:grid;place-items:center;font-size:52px;
+  background:var(--glass-soft);border:1px solid var(--stroke);
+  box-shadow:inset 0 1px 0 var(--sheen),var(--shadow-lift);
+}
+.obd-dot{position:absolute;border-radius:50%}
+.obd-dot.d1{width:13px;height:13px;background:var(--blue);opacity:.5;top:24%;left:16%}
+.obd-dot.d2{width:9px;height:9px;background:var(--cal-red);opacity:.4;top:33%;right:18%}
+.obd-dot.d3{width:10px;height:10px;background:#30d158;opacity:.4;bottom:26%;left:20%}
+.obd-dot.d4{width:8px;height:8px;background:var(--cal-red);opacity:.32;bottom:34%;right:22%}
+/* 称呼输入：下划线大字（参考稿样式），聚焦光标蓝 */
+.obd-nick{
+  margin-top:34px;width:100%;background:transparent;border:none;
+  border-bottom:2px solid var(--blue);padding:6px 2px 10px;
+  font-size:22px;font-weight:700;color:var(--ink);caret-color:var(--blue);
+}
+.obd-nick:focus{outline:none}
+.obd-hint{margin-top:10px;font-size:11.5px;color:var(--faint)}
+/* 头像步：大圆 + 相机角标 */
+.obd-avrow{position:relative;flex:1;display:flex;align-items:center;justify-content:center;min-height:0}
+.obd-ava{
+  width:116px;height:116px;border-radius:50%;display:grid;place-items:center;
+  font-size:44px;font-weight:700;color:var(--ink);overflow:hidden;
+  background:var(--glass-soft);border:1px solid var(--stroke);
+  box-shadow:inset 0 1px 0 var(--sheen),var(--shadow);
+  background-size:cover;background-position:center;
+}
+.obd-ava.has-photo{color:transparent}
+.obd-cam{
+  position:absolute;top:calc(50% + 26px);left:calc(50% + 26px);
+  width:38px;height:38px;border-radius:50%;
+  background:var(--blue);border:3px solid var(--bg);
+  display:grid;place-items:center;
+  transition:transform .16s var(--spring);
+}
+.obd-cam:active{transform:scale(.92)}
+.obd-cam svg{width:17px;height:17px;stroke:#fff;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+/* 就绪页：对勾描边动画（stroke-dashoffset 一次性，播完即停不耗电） */
+.obd-donewrap{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:0}
+.obd-ck{width:92px;height:92px;margin-bottom:14px}
+.obd-ck circle{
+  stroke:var(--blue);stroke-width:3.5;fill:none;
+  stroke-dasharray:151;stroke-dashoffset:151;
+}
+.obd-ck path{
+  stroke:var(--blue);stroke-width:4.5;fill:none;stroke-linecap:round;stroke-linejoin:round;
+  stroke-dasharray:40;stroke-dashoffset:40;
+}
+.obd-step.is-on .obd-ck circle{animation:obdDash 1s .15s var(--ease) forwards}
+.obd-step.is-on .obd-ck path{animation:obdDash .5s 1s var(--ease) forwards}
+@keyframes obdDash{to{stroke-dashoffset:0}}
+
+/* ---- 头像选择面板（#130）：引导与「我的」页共用 ----
+   z 77：浮在引导层(76)/资料浮层之上、裁剪台(78)之下 —— 拍照/相册确认后
+   裁剪台从它头顶升起，取消则原地返回。玻璃语言与 .obd 同源。 */
+.ava-wrap{position:absolute;inset:0;z-index:77;pointer-events:none}
+.ava-wrap.is-open{pointer-events:auto}
+.ava-dim{
+  position:absolute;inset:0;background:rgba(0,0,0,.4);opacity:0;
+  transition:opacity .26s var(--ease);
+}
+.ava-wrap.is-open .ava-dim{opacity:1}
+.ava-sheet{
+  position:absolute;left:10px;right:10px;bottom:calc(10px + var(--safe-bottom) + var(--kb-inset,0px));
+  border-radius:var(--r-lg);overflow:hidden;
+  /* 近实心玻璃：.78 的 --glass 会把底下内容（如「继续」按钮）透进来，
+     面板行多、面积大，取 .94 —— 描边 / 高光 / 柔影仍在，玻璃感不丢 */
+  background:rgba(255,255,255,.94);border:1px solid var(--stroke);
+  box-shadow:inset 0 1px 0 var(--sheen),var(--shadow-lift);
+  /* 收起 = 下推 102% **加上**滑完撤绘制（#147）。
+     下推那点余量只管到自己高度的 2%：面板 308px 时 6.2px，盖不住「悬空那
+     10px + safe-bottom + kb-inset」—— 顶边于是留 3.8px 在屏内，黑底的看图层
+     上就是屏底那条白线（浅底页面衬不出来，所以一直没人报）；键盘一起
+     （--kb-inset≈300）时同一处会漏出整块面板。
+     补法不动几何：动画照旧，只是滑完 420ms 后不再画。 */
+  transform:translateY(102%);
+  visibility:hidden;
+  transition:transform .42s var(--spring),visibility 0s linear .42s;
+}
+body[data-theme="dark"] .ava-sheet{background:rgba(26,26,29,.94)}
+.ava-wrap.is-open .ava-sheet{transform:none;visibility:visible;transition:transform .42s var(--spring)}
+.ava-page{display:none;padding:4px 0 6px}
+.ava-page.is-on{display:block}
+.ava-head{
+  padding:13px 0 11px;text-align:center;font-size:12px;font-weight:600;color:var(--muted);
+  border-bottom:1px solid var(--hair);
+}
+.ava-row{
+  display:block;width:100%;padding:15px 0;text-align:center;
+  font-size:15.5px;font-weight:600;color:var(--ink);
+  border-bottom:1px solid var(--hair);
+  transition:background .18s var(--ease);
+}
+.ava-row:active{background:var(--fill)}
+.ava-row.is-cancel{border-bottom:none;border-top:1px solid var(--hair);color:var(--muted)}
+.ava-subhead{
+  display:flex;align-items:center;padding:10px 14px 8px;
+  font-size:13px;font-weight:700;color:var(--ink-2);
+  border-bottom:1px solid var(--hair);
+}
+.ava-back{width:32px;height:32px;margin-left:-8px;border-radius:50%;font-size:20px;color:var(--ink-2);display:grid;place-items:center}
+.ava-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;padding:16px 18px 12px}
+.ava-cell{
+  width:58px;height:58px;border-radius:50%;margin:0 auto;overflow:hidden;
+  display:grid;place-items:center;font-size:26px;
+  background:var(--tile);border:1px solid var(--tile-line);
+  box-shadow:inset 0 1px 0 var(--tile-rim),inset 0 0 0 .5px var(--tile-line);
+  transition:transform .16s var(--spring),box-shadow .2s var(--ease);
+}
+.ava-cell:active{transform:scale(.92)}
+.ava-cell img{width:100%;height:100%;display:block}
+/* 头像格外包一层 .ava-slot：选中那颗绿勾要盖在圆**外**，
+   而 .ava-cell 自己 overflow:hidden（圆形裁切），勾挂在它身上会被裁掉。
+   #205 起只剩 Emoji 格用它 —— 「预设头像库」整页撤了，.ava-cell.is-face 一并删。 */
+.ava-slot{position:relative;width:58px;height:58px;margin:0 auto}
+.ava-slot::after{
+  content:"✓";position:absolute;right:-3px;bottom:-3px;width:21px;height:21px;border-radius:50%;
+  background:var(--green);color:#fff;font-size:12.5px;font-weight:700;line-height:21px;text-align:center;
+  box-shadow:0 1px 3px rgba(0,0,0,.22);opacity:0;transform:scale(.5);
+  transition:opacity .18s var(--ease),transform .22s var(--spring);
+}
+.ava-slot.is-on::after{opacity:1;transform:none}
+
+/* ---- 应用内确认弹窗（#62）：取代 window.confirm() ----
+   原生弹窗（Android WebView 里是蓝 CANCEL / OK）与暖纸色界面割裂。
+   面板沿用合并弹窗的语言（圆角 / --surface / --shadow-lift），但按钮是横排两枚 ——
+   确认框只有「取消 / 确定」两个动作，竖排占高且不成组。
+   .is-danger 由 askConfirm 加在确定键上：破坏性操作用实心红，一眼看出后果。
+   body 用 white-space:pre-line：调用方仍在文案里写 \n 分段，不必拆成多个元素。 */
+.cfm-modal{
+  position:absolute;inset:0;z-index:85;display:grid;place-items:center;
+  background:rgba(0,0,0,.38);
+  visibility:hidden;opacity:0;pointer-events:none;
+  transition:opacity .22s var(--ease),visibility .22s;
+}
+.cfm-modal.is-open{visibility:visible;opacity:1;pointer-events:auto}
+.cfm-panel{
+  /* ⚠️ 底**必须**是实心 --surface：#180 想给它半透明玻璃，但 verify_confirm 钉着
+     `.cfm-panel` 的 backgroundColor === rgb(255,255,255)（那是「弹窗不能透」的判据）。
+     玻璃感改由斜向受光面（background-image）+ 顶缘内高光 + 描边 + 厚柔影承担。
+     #201：胶囊化的框 —— 大圆角（--r-lg）、按钮全走胶囊（.cfm-btn）。 */
+  width:min(320px,86%);background-color:var(--surface);background-image:var(--tile-shine);
+  border:1px solid var(--pane-line);border-radius:var(--r-lg);
+  padding:22px 20px 16px;box-shadow:inset 0 1px 0 var(--tile-rim),var(--pane-sh);text-align:center;
+}
+.cfm-modal.is-open .cfm-panel{animation:cfmIn .3s var(--spring) backwards}
+@keyframes cfmIn{from{opacity:0;transform:scale(.94) translateY(6px)}to{opacity:1;transform:none}}
+.cfm-title{font-size:16.5px;font-weight:700;letter-spacing:-.3px}
+.cfm-body{margin:9px 2px 16px;font-size:13px;line-height:1.75;color:var(--muted);white-space:pre-line}
+.cfm-acts{display:flex;gap:9px}
+.cfm-btn{
+  flex:1;padding:12px 0;border-radius:999px;
+  font-size:13.5px;font-weight:600;
+  background-color:var(--tile);background-image:var(--tile-shine);color:var(--ink);
+  box-shadow:inset 0 0 0 .5px var(--tile-line),inset 0 1px 0 var(--tile-rim);
+}
+/* #201 主按钮照参考图换黑（「保存」那颗的同一套 --obd-solid 令牌）；危险操作仍红 */
+.cfm-btn.is-ok{background:var(--obd-solid);color:var(--obd-solid-ink);
+  box-shadow:inset 0 .5px 0 var(--obd-solid-rim),0 6px 16px rgba(30,38,54,.18)}
+.cfm-btn.is-ok.is-danger{background:#ff375f;color:#fff;
+  box-shadow:inset 0 .5px 0 rgba(255,255,255,.24),0 6px 16px rgba(255,55,95,.28)}
+.cfm-btn:active{opacity:.75}
+
+/* ---- 写日记草稿询问（#201）：与 cfm 同骨架的胶囊玻璃 ----
+   两个都是「前进」动作，没有取消键 —— 取消 = 点底色 / 返回键（层表里第一层）。 */
+.da-acts{display:flex;flex-direction:column;gap:9px}
+.da-btn{
+  width:100%;padding:13px 0;border-radius:999px;
+  font-size:14px;font-weight:600;
+  background-color:var(--tile);background-image:var(--tile-shine);color:var(--ink);
+  box-shadow:inset 0 0 0 .5px var(--tile-line),inset 0 1px 0 var(--tile-rim);
+  transition:transform .2s var(--spring);
+}
+.da-btn.is-main{
+  background:var(--obd-solid);color:var(--obd-solid-ink);
+  box-shadow:inset 0 .5px 0 var(--obd-solid-rim),0 6px 16px rgba(30,38,54,.18);
+}
+.da-btn:active{transform:scale(.97)}
+
+/* ---- 首次登录：本机 / 云端 三选一 ---- */
+.merge-modal{
+  position:absolute;inset:0;z-index:80;display:grid;place-items:center;
+  background:rgba(0,0,0,.38);
+  visibility:hidden;opacity:0;pointer-events:none;
+  transition:opacity .26s var(--ease),visibility .26s;
+}
+.merge-modal.is-open{visibility:visible;opacity:1;pointer-events:auto}
+.merge-panel{
+  width:min(302px,84%);background-color:var(--pane);background-image:var(--tile-shine);
+  border:1px solid var(--pane-line);border-radius:var(--r-md);
+  padding:22px 20px 14px;box-shadow:inset 0 1px 0 var(--tile-rim),var(--pane-sh);text-align:center;
+}
+.merge-title{font-size:16px;font-weight:600;letter-spacing:-.3px}
+.merge-info{margin:9px 2px 16px;font-size:12.5px;line-height:1.7;color:var(--muted)}
+.merge-btn{
+  display:block;width:100%;padding:11px 0;margin-bottom:8px;
+  font-size:13.5px;font-weight:500;border-radius:var(--r-sm);
+  background-color:var(--tile);background-image:var(--tile-shine);color:var(--ink);
+  box-shadow:inset 0 0 0 .5px var(--tile-line),inset 0 1px 0 var(--tile-rim);
+}
+.merge-btn.is-primary{background:var(--blue);color:#fff;font-weight:600}
+.merge-btn:active{opacity:.72}
+
+/* ---- 合规页：隐私政策 / 用户协议 ---- */
+.legal-page{
+  position:absolute;inset:0;z-index:86;display:flex;flex-direction:column;
+  background:var(--bg);
+  /* #185：同上 —— 合规页是全屏 --bg 层，它开着时状态栏要跟着回到主题底色
+     （它常从「我的」页的「设置」开出来，那儿的状态栏是香槟金）。 */
+  --sb-top:var(--bg);
+  visibility:hidden;opacity:0;pointer-events:none;
+  transition:opacity .3s var(--ease),visibility .3s;
+}
+.legal-page.is-open{visibility:visible;opacity:1;pointer-events:auto}
+/* #182：上内边距 6px → 0，与 .page 同一口径 —— 合规页复用 .pg-head，页头上方同样不许
+   留那条没被盖住的折射底（页头自己那 20px 上内边距照旧补上）。
+   #183：这一条上内边距改成 `--safe-top` —— 合规页是全屏浮层（`.legal-page{inset:0}`，
+   包含块是 `.screen` 的 padding box，所以它**铺到屏顶、连状态栏那一带也盖住**），
+   而它不像 `.pages` 那样被 `.screen` 的 padding 顶下来 → 页头原本停在 y=20，
+   真机上被 Android 状态栏压住（标题与右上角 ✕ 都够不着）。
+   改法沿用房子里的老写法（`.tlc-panel` / `.obd-step` / `.launch` 同款）：
+   **浮层照旧铺满整屏，让内容自己让开安全区** —— 页头因此落在 `--safe-top` 下面。 */
+.legal-shell{flex:1;overflow-y:auto;overflow-x:hidden;padding:var(--safe-top) 20px var(--tab-inset);-webkit-overflow-scrolling:touch}
+.legal-close{margin-left:auto;font-size:14px;color:var(--muted);padding:5px 9px;border-radius:var(--r-xs);
+  background:var(--tile);box-shadow:inset 0 0 0 .5px var(--tile-line),inset 0 1px 0 var(--tile-rim)}
+.legal-body{padding-bottom:8px}
+/* 页内分段器（#62）：设置页把「隐私政策」「用户协议」合成一行入口后，
+   两份文档靠这里切换。轨道用 --fill、选中片提亮到 --surface ——
+   与 .tlc-cal-title / .rc-title 那套「选中态加浅底」的语言一致。 */
+.legal-seg{display:flex;gap:5px;margin:0 0 16px;padding:3px;border-radius:var(--r-sm);background:var(--tile);
+  box-shadow:inset 0 0 0 .5px var(--tile-line),inset 0 1px 0 var(--tile-rim)}
+.legal-seg-btn{
+  flex:1;padding:7px 0;border-radius:var(--r-xs);font-size:12.5px;font-weight:600;
+  color:var(--muted);transition:background .2s var(--ease),color .2s var(--ease);
+}
+.legal-seg-btn.is-on{background:var(--surface);color:var(--ink);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 1px 2px rgba(30,28,25,.06),0 4px 10px rgba(30,28,25,.05)}
+/* 合规页自己就是一块不透明的底，复用 .pg-head 只是要它的排版；
+   这里把毛玻璃摘掉 —— 后面什么都没有，blur 纯粹白烧帧。 */
+.legal-page .pg-head{-webkit-backdrop-filter:none;backdrop-filter:none;background:var(--bg)}
+.lg-h{margin:20px 2px 8px;font-size:15px;font-weight:600;letter-spacing:-.2px}
+.lg-p{margin:0 2px;font-size:13.5px;line-height:1.82;color:var(--ink-2)}
+
+/* 旧「我的碑信」归档页的样式（.is-letterbox 三行 + .lb-*）已并入前面的
+   §互动 · 写信与收信 —— #77 起互动页只有收件箱一种形态，不再有登录 / 未登录两套切换。
+   ⚠️ 别在这里重新定义 .lb-*，会和前面那份打架（后写的赢，改样式会改了个寂寞）。 */
+
+/* ---- 性能降级（S4）：低端机 / 低帧率时只摘毛玻璃 ----
+   保留 .pg-head 的底色、内边距与层级，所以布局与命中区域完全不变
+   （关掉 blur 实测 33fps → 66fps）。 */
+html.is-lite .pg-head{
+  -webkit-backdrop-filter:none;backdrop-filter:none;
+  background:var(--bg);
+}
+html.is-lite .auth-mask{background:rgba(0,0,0,.5)}
+
+/* ---- 版本更新提示卡（只在原生壳里、且真的发现新版时才出现） ----
+   刻意不做成弹窗：更新不是"必须立刻处理"的事，弹窗会打断用户本来要做的
+   事。放进「我的」页顶部，看到了就看到了，不看也不挡路。
+   底色用 --blue-soft 与普通卡片区分，边框继承 .card 的 hairline。 */
+.upd-card{background:var(--blue-soft);border-color:transparent}
+.upd-head{display:flex;align-items:center;gap:9px;margin-bottom:10px}
+.upd-badge{
+  flex:none;font-size:10px;font-weight:600;color:#fff;background:var(--blue);
+  border-radius:999px;padding:3px 9px;letter-spacing:.2px;
+}
+.upd-head h3{font-size:15px;font-weight:650;color:var(--ink);letter-spacing:-.2px}
+.upd-notes{margin:0 0 14px;padding-left:17px;list-style:disc}
+.upd-notes li{font-size:13px;line-height:1.72;color:var(--ink-2);margin-bottom:3px}
+.upd-acts{display:flex;align-items:center;gap:9px}
+.upd-go{
+  flex:1;text-align:center;text-decoration:none;
+  background:var(--blue);color:#fff;font-size:14.5px;font-weight:600;
+  padding:11px 0;border-radius:var(--r-sm);
+}
+.upd-go:active{opacity:.82}
+.upd-go.is-off{background:var(--fill);color:var(--muted);font-weight:500}
+.upd-later{flex:none;font-size:14px;color:var(--muted);background:var(--tile);padding:11px 16px;border-radius:var(--r-sm);
+  box-shadow:inset 0 0 0 .5px var(--tile-line),inset 0 1px 0 var(--tile-rim)}
+.upd-later:active{opacity:.7}
+.upd-hint{margin:11px 2px 0;font-size:11.5px;line-height:1.6;color:var(--faint)}
+
+
+/* ===== 书目编辑浮层（新增 / 修改 / 删除共用一张表）=====
+   复用 .sheet 的进出手感；与碑详情一样不引 backdrop-filter（性能结论见工作日志 #12 / #21）。 */
+.sheet-scrim.plain{backdrop-filter:none}
+.bed-head{padding:14px 0 2px}
+.bed-title{font-size:19px;font-weight:700;letter-spacing:-.5px}
+.bed-sub{font-size:12px;color:var(--muted);margin-top:5px;font-weight:400}
+.bed-field{margin-top:14px}
+.bed-lab{font-size:11.5px;color:var(--muted);font-weight:500;letter-spacing:.2px}
+.bed-in{
+  width:100%;background:var(--tile);border:1px solid var(--tile-line);border-radius:var(--r-sm);
+  box-shadow:inset 0 1px 0 var(--tile-rim);
+  padding:11px 12px;font-size:13.5px;margin-top:7px;color:var(--ink);
+  font-family:inherit;transition:border-color .25s;
+}
+.bed-in:focus{border-color:var(--blue);background:var(--surface);outline:none}
+.bed-in::placeholder{color:var(--faint)}
+/* 「正文」文本框（.bed-area）、并排两列（.bed-row2）与下方小字（.bed-hint）
+   随阅读线删除 —— 编辑表单不再有正文 / 页数 / 已读% 这些字段。 */
+/* #201：钉层选项能长过 6 格（书架满了自动加层）—— 放开换行，别把面板撑破 */
+.bed-seg{display:flex;flex-wrap:wrap;gap:8px;margin-top:7px}
+.bed-seg .seg{
+  flex:1 1 44px;min-width:44px;border-radius:999px;padding:10px 0;font-size:12.5px;font-weight:600;text-align:center;
+  /* 摘掉 .seg 基类那层 backdrop-filter：这一处在**浮层**里（必读 §1.2 的红线），
+     玻璃感同样由半透明底 + 描边 + 顶缘高光撑起来。 */
+  -webkit-backdrop-filter:none;backdrop-filter:none;
+  background-color:var(--tile);background-image:var(--tile-shine);color:var(--ink);
+  box-shadow:inset 0 0 0 .5px var(--tile-line),inset 0 1px 0 var(--tile-rim);
+  transition:transform .2s var(--spring),background .2s,color .2s;
+}
+.bed-seg .seg.is-on{background:var(--obd-solid);color:var(--obd-solid-ink)}
+.bed-seg .seg:active{transform:scale(.96)}
+.bed-stars{display:flex;gap:6px;margin-top:9px;font-size:23px;color:var(--faint);line-height:1}
+.bed-stars i{cursor:pointer;transition:transform .18s var(--spring),color .2s;font-style:normal}
+.bed-stars i.on{color:#e8a33d}
+.bed-stars i:active{transform:scale(1.18)}
+.bed-acts{display:flex;gap:9px;margin-top:20px}
+.bed-btn{
+  flex:1;border-radius:var(--r-sm);padding:12px 0;font-size:13px;font-weight:600;text-align:center;
+  background-color:var(--tile);background-image:var(--tile-shine);color:var(--ink);
+  box-shadow:inset 0 0 0 .5px var(--tile-line),inset 0 1px 0 var(--tile-rim);
+  transition:transform .2s var(--spring);
+}
+.bed-btn.main{background:var(--ink);color:var(--bg)}
+.bed-btn.danger{background:rgba(255,55,95,.12);color:#ff375f}
+.bed-btn:active{transform:scale(.96)}
+.bed-btn[disabled]{opacity:.4;pointer-events:none}
+
+
+/* ---------------- 自己传的封面 + 加书表单的选图区（#57） ---------------- */
+/* 有图的封面：图铺满，不叠书名与作者（图上压白字看不清，书名在封面下方另有一行） */
+.cover-art.is-img{padding:0}
+.cover-art.is-img img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.bed-cover{display:flex;gap:12px;align-items:stretch;margin-top:8px}
+.bed-cover-face{
+  flex:none;width:78px;height:104px;border-radius:11px;overflow:hidden;position:relative;
+  background:var(--fill);box-shadow:0 1px 2px rgba(0,0,0,.08),0 6px 14px rgba(0,0,0,.10);
+}
+.bed-cover-face img{width:100%;height:100%;object-fit:cover;display:block}
+.bed-cover-none{
+  position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:6px;
+  font-size:10.5px;line-height:1.45;color:rgba(255,255,255,.92);text-shadow:0 1px 3px rgba(0,0,0,.25);
+}
+.bed-cover-acts{display:flex;flex-direction:column;gap:7px;flex:1;min-width:0;justify-content:center}
+.bed-mini{
+  border-radius:var(--r-xs);padding:9px 10px;font-size:12px;font-weight:600;text-align:center;
+  background-color:var(--tile);background-image:var(--tile-shine);color:var(--ink);
+  box-shadow:inset 0 0 0 .5px var(--tile-line),inset 0 1px 0 var(--tile-rim);
+  transition:transform .2s var(--spring);
+}
+.bed-mini:active{transform:scale(.96)}
+.bed-mini.is-ghost{background:transparent;color:var(--muted);box-shadow:inset 0 0 0 1px var(--tile-line)}
+
+/* ---------------- 封面裁剪台（#92） ----------------
+   选完图先裁成 3:4 书封比例再存：书架只写书名，封面留给点开书后的详情那一张。
+   台面刻意做成深色全屏 —— 裁图时四周压暗，框内的颜色和书封本色才看得准。
+   暗罩用裁剪框的 0 0 0 9999px 阴影铺出去（配 stage 的 overflow:hidden），
+   比四块遮罩 div 少四层合成；也不用 backdrop-filter（#12/#21 的帧率结论）。 */
+.cropper{position:absolute;inset:0;z-index:78;display:none;flex-direction:column;background:#111114;color:#f5f5f7;--sb-top:#111114}
+.cropper.is-open{display:flex}
+.cr-head{flex:none;padding:calc(var(--safe-top) + 16px) 20px 8px}
+.cr-title{font-size:17px;font-weight:650;letter-spacing:-.4px}
+.cr-sub{font-size:11.5px;color:rgba(245,245,247,.58);margin-top:4px;line-height:1.5}
+/* touch-action:none 是必需的：否则竖向拖图会变成整页滚动，拖不动图 */
+.cr-stage{flex:1;position:relative;overflow:hidden;margin:6px 14px 0;border-radius:var(--r-sm);
+  background:#0a0a0c;touch-action:none}
+.cr-img{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform}
+.cr-img img{display:block;-webkit-user-select:none;user-select:none;-webkit-user-drag:none}
+.cr-frame{
+  position:absolute;pointer-events:none;
+  box-shadow:0 0 0 9999px rgba(8,8,10,.62);
+  border:1px solid rgba(255,255,255,.92);
+}
+/* 三分构图线：只在拖动时淡入，松手淡出 —— 静止时不干扰看清画面 */
+.cr-g{position:absolute;background:rgba(255,255,255,.32);opacity:0;transition:opacity .18s var(--ease)}
+.cr-stage.is-moving .cr-g{opacity:1}
+.cr-g.g1{left:33.333%;top:0;bottom:0;width:1px}
+.cr-g.g2{left:66.666%;top:0;bottom:0;width:1px}
+.cr-g.g3{top:33.333%;left:0;right:0;height:1px}
+.cr-g.g4{top:66.666%;left:0;right:0;height:1px}
+/* 四角：只画角上的两条边，中间留空（iOS 照片裁剪同款） */
+.cr-c{position:absolute;width:15px;height:15px;border:2.5px solid #fff}
+.cr-c.c1{left:-1px;top:-1px;border-right:0;border-bottom:0}
+.cr-c.c2{right:-1px;top:-1px;border-left:0;border-bottom:0}
+.cr-c.c3{left:-1px;bottom:-1px;border-right:0;border-top:0}
+.cr-c.c4{right:-1px;bottom:-1px;border-left:0;border-top:0}
+.cr-bar{flex:none;display:flex;align-items:center;gap:12px;
+  padding:14px 18px calc(var(--safe-bottom, env(safe-area-inset-bottom, 0px)) + 16px)}
+.cr-btn{
+  flex:none;font-family:inherit;border-radius:var(--r-sm);padding:10px 15px;font-size:13px;font-weight:600;
+  background:rgba(255,255,255,.14);color:#fff;transition:transform .2s var(--spring);
+  box-shadow:inset 0 0 0 .5px rgba(255,255,255,.22),inset 0 1px 0 rgba(255,255,255,.26);
+}
+.cr-btn:active{transform:scale(.96)}
+.cr-btn.main{background:#f5f5f7;color:#111114}
+.cr-zoom{flex:1;display:flex;align-items:center;gap:7px;color:rgba(255,255,255,.62);min-width:0}
+.cr-zoom-ic{font-size:11px;flex:none}
+#crZoom{
+  flex:1;min-width:0;-webkit-appearance:none;appearance:none;height:3px;border-radius:2px;
+  background:rgba(255,255,255,.26);outline:none;
+}
+#crZoom::-webkit-slider-thumb{
+  -webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:#fff;
+  box-shadow:0 1px 4px rgba(0,0,0,.35);
+}
+
+/* ---------------- 头像大图（#138 起；#141 改版成看图页 + 长按保存） ----------------
+   「我的」页头上那颗 52px 圆头像放不下细节：点它弹这张整页黑底看图层，
+   顶栏 = 返回 ‹ + 居中「头像」+ 右「⋯」（样式照用户给的参考图，像系统相册的看图页）。
+   源就是头像本体（≤1280px 方形 JPEG，见 app.js AVA_OUT），铺多宽由 JS 算：
+   min(层宽, naturalWidth) —— 新头像全宽清晰，老账号小头像不超源（#140 规矩没变）。
+   整层自己仍是关闭热区（点任意处收起）；保存动作在 .avasave 抽屉里（z 73）。 */
+.avview{
+  position:absolute;inset:0;z-index:72;display:none;cursor:zoom-out;background:#000;
+  /* #185：大图页整屏纯黑，状态栏跟着黑（avaStatusBar() 开层时也设一次 —— 两条路同值；
+     这里声明之后，回到前台那条补同步的路也会给对，不再把主题色刷在黑底上）。 */
+  --sb-top:#000;
+}
+.avview.is-open{display:block}
+.avview-bar{
+  position:absolute;top:0;left:0;right:0;z-index:2;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:calc(var(--safe-top) + 4px) 6px 4px;
+}
+.avview-title{
+  position:absolute;left:0;right:0;top:var(--safe-top);height:48px;
+  line-height:48px;text-align:center;pointer-events:none;
+  font-size:17px;font-weight:600;color:#f5f5f7;letter-spacing:.5px;
+}
+.avview-btn{
+  position:relative;z-index:1;width:44px;height:48px;border:0;background:none;padding:0;
+  display:grid;place-items:center;cursor:pointer;font-family:inherit;color:#f5f5f7;
+  -webkit-tap-highlight-color:transparent;
+}
+.avview-btn:first-child{font-size:30px;font-weight:300}
+.avview-btn:last-child{font-size:22px;letter-spacing:1px}
+.avview-img{
+  position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  background:#000;-webkit-user-select:none;user-select:none;-webkit-user-drag:none;
+}
+/* 小头像（源 < 480px）才出现的重设提示：位置躲开底栏那条（tabbar bottom 26 + 高 72） */
+.avview-cap{
+  position:absolute;left:0;right:0;bottom:calc(var(--safe-bottom, env(safe-area-inset-bottom, 0px)) + 108px);
+  text-align:center;font-size:12px;letter-spacing:.6px;color:rgba(245,245,247,.44);
+}
+/* 重设入口（#142）：源太小（<480px）时和上面那句提示一起出。
+   老账号的头像停在 128/256px —— 看图页按「不放大超源」铺出来必然小一号，
+   光写一句「可在编辑里重设」还得让人自己去找，这里直接给一键的回头路。
+   透明底 + 细描边（不用 backdrop-filter），压在提示句上方一行。 */
+.avview-reset{
+  position:absolute;left:50%;transform:translateX(-50%);
+  bottom:calc(var(--safe-bottom, env(safe-area-inset-bottom, 0px)) + 132px);
+  height:36px;padding:0 18px;border:1px solid rgba(245,245,247,.34);border-radius:999px;
+  background:rgba(255,255,255,.10);color:#f5f5f7;
+  font-size:13.5px;font-family:inherit;letter-spacing:.4px;cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+}
+.avview-reset[hidden]{display:none}
+/* 保存头像抽屉（#141）：白底两行（保存到手机 / 取消），照系统相册的动作表画。
+   scrim 压暗大图，sheet 贴底留 10px 边距，两行分开各自圆角 —— 与参考图一致。 */
+.avasave{
+  position:absolute;inset:0;z-index:73;display:none;
+}
+.avasave.is-open{display:block}
+.avasave-scrim{
+  position:absolute;inset:0;background:rgba(0,0,0,.45);cursor:pointer;
+}
+.avasave-sheet{
+  position:absolute;left:8px;right:8px;
+  bottom:calc(var(--safe-bottom, env(safe-area-inset-bottom, 0px)) + 10px);
+  display:flex;flex-direction:column;gap:9px;
+}
+.avasave-row{
+  border:0;margin:0;height:57px;border-radius:var(--r-sm);background:#fff;color:#111;
+  font-size:17px;font-family:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent;
+}
+.avasave-row.is-cancel{font-weight:600}
+/* 「更多选项」折叠区已删除（.bed-more / .bed-more-caret / .bed-morebody）——
+   编辑表单只剩 阅读状态 与 评分，直接平铺在首屏，不再折叠。 */
+/* 夜读那句里的「，那天在读 X」：随笔不挂书时整段收掉（#57）。
+   span 没有 display 声明，UA 的 [hidden]{display:none} 本来就够用，
+   这里写一条显式的，免得日后有人给它加 display 又把 hidden 盖掉。 */
+#nightBookSeg[hidden]{display:none}

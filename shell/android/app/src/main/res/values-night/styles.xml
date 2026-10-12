@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- #105：系统深色下的同名主题覆盖。values/styles.xml 的 AppTheme.NoActionBar
+         是 DayNight 父主题，系统切到深色时由本文件接管这几条窗口装饰。
+         ⚠️ 深色底色引用 @color/appWindowBackground 即可 —— values-night/splash.xml
+         里已把同名 color 覆盖成 #0e0e10（appWindowBackgroundDark 只给 Java 取色用，
+         在 values 里定义、并不会随夜间覆盖）。浅底配深色图标 / 深底配浅色图标
+         （windowLightStatusBar=false）与浅色版成对。运行时 syncNativeStatusBar()
+         按 App 内主题重设仍是权威，本文件只是冷启动与"被系统重置后"的兜底。
+         ⚠️ 只覆盖这几条，其余属性继承 values 同名主题；改动时注意两处成对。 -->
+    <style name="AppTheme.NoActionBar" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="android:windowBackground">@color/appWindowBackground</item>
+        <!-- #188：同 values/styles.xml —— 贴边后状态栏那一条由网页自己画，平台这层要透明。 -->
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+
+</resources>

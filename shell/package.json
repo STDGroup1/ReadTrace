@@ -1,0 +1,22 @@
+{
+  "name": "readtrace-shell",
+  "version": "1.0.0",
+  "private": true,
+  "description": "阅迹 ReadTrace 的 Android 外壳：把 ../app 的网页原样装进 Capacitor 壳，出签名 APK",
+  "scripts": {
+    "web": "node sync-web.js",
+    "debug": "npm run web && cap sync android && node gradle.js assembleDebug",
+    "release": "npm run web && cap sync android && node gradle.js assembleRelease"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.2.0",
+    "@capacitor/app": "^6.0.2",
+    "@capacitor/core": "^6.2.0",
+    "@capacitor/keyboard": "^6.0.3",
+    "@capacitor/splash-screen": "^6.0.3",
+    "@capacitor/status-bar": "^6.0.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.2.0"
+  }
+}

@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Base application theme. -->
+    <style name="AppTheme" parent="Theme.AppCompat.Light.DarkActionBar">
+        <!-- Customize your theme here. -->
+        <item name="colorPrimary">@color/colorPrimary</item>
+        <item name="colorPrimaryDark">@color/colorPrimaryDark</item>
+        <item name="colorAccent">@color/colorAccent</item>
+    </style>
+
+    <style name="AppTheme.NoActionBar" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+        <item name="android:background">@null</item>
+        <!-- #102：内容期的窗口背景。⚠️ 上面那条 android:background 在「主题」里
+             并不等于窗口背景 —— 真正管窗口背景的属性是 android:windowBackground。
+             原先只写了 android:background，于是 BridgeActivity 用 setTheme() 切到本主题后，
+             窗口背景并没有被换掉，仍留在启动主题那一层（暖米 #e9dec6）。
+             后果：后台「最近任务」卡片顶部、被系统状态栏遮挡的那一段由窗口背景填充，
+             于是露出一条暖米/棕色带（用户 #102 反馈）。
+             这里显式给成内容底色；深色由 values-night 的同名 color 覆盖。 -->
+        <item name="android:windowBackground">@color/appWindowBackground</item>
+        <!-- #188 贴边：状态栏**必须透明** —— 平台会拿这个值去画它自己那个
+             `statusBarBackground` 视图（实测它盖在 [0,0][1080,128] 上，把网页铺到屏顶的
+             内容挡掉，露出的正是这里的颜色）。#186 那会儿是自画色条压在它上面才看着对，
+             贴边之后要的就是「没有这一层」。⚠️ Android 15 起 setStatusBarColor() 是空操作
+             （见 MainActivity 的贴边注释），所以只能在这里定死。 -->
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <!-- #105：状态栏图标的明暗静态兜底。本属性全工程此前没有任何声明（appcompat
+             库里也没有），系统回落到默认 false = 浅色图标；而主题底色写死是亮色 ——
+             一旦运行时插件那层被重置（典型：进后台再回来），就是"亮底白字"、时间电量
+             看不清。这里与底色成对写死：浅色 = 深色图标；深色由 values-night 同名
+             主题覆盖成 false。运行时 syncNativeStatusBar() 仍是权威，这只是一层兜底。 -->
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+
+
+    <!-- 开屏主题（App 启动时那一下的画面）。
+         ⚠️ 下面这两个属性用的是 **androidx core-splashscreen 的兼容属性名**
+         （没有 android 前缀），必须写在**基础** values 里，不能只写在 values-v31：
+         Android 11 及以下由这个库的向后兼容实现接管开屏，它读的就是同一对属性。
+         此前只写在 values-v31，于是 pre-31 回落到库的默认值
+         （底色 ?android:colorBackground 跟随系统，图标 @android:drawable/sym_def_app_icon），
+         系统开屏与米黄封面之间会闪一下色差、还夹着一枚别人的图标。
+         API 31+ 由 values-v31/styles.xml 再补一层同值属性，两处必须同值、改一处就要改另一处。
+         **#60 起图标改成全透明的 ic_splash_blank** —— 系统开屏只留底色：
+         它的 #e9dec6 与启动页的封面底色自定义属性（styles.css 里的 cover-bg）逐像素同值，
+         交接因此完全无缝。
+         原先那枚悬空线稿（ic_splash_icon）与启动页的纸块封面形态不同、尺寸差 2.7 倍、
+         垂直中心也差一截，200ms 交叉淡出时会互相打架，看着就是「卡了一帧」。
+         完整推演见 drawable/ic_splash_blank.xml 的注释。
+         android:background 指向的整屏位图只剩「兼容库没能接管时的兜底」这一条路在用，
+         由 gen_cover_assets.py 产出；它的规格由 verify_launch.py 核。 -->
+    <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
+        <item name="android:background">@drawable/splash</item>
+        <item name="windowSplashScreenBackground">@color/splashBackground</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_blank</item>
+    </style>
+
+    <!-- #69：深色主题的开屏变体。MainActivity 冷启动时读 ThemeStore（SharedPreferences）
+         里 App 内「深色模式」的值：为 dark 就在 super.onCreate 之前 setTheme 到本主题。
+         说明两点：
+         ① API 31+ 的系统开屏底色由 system_server 按 Manifest 主题静态绘制，运行时
+            setTheme 改不了那扇 starting window —— 本主题在 31+ 上的作用是让**应用窗口
+            底色**（starting window 淡出后露出的第一层）跟随 App 内主题，配合
+            launchFadeOutDuration 的交叉淡出把「暖米一闪」变成柔和过渡；
+         ② pre-31 的开屏由 androidx core-splashscreen 兼容库在应用内绘制、读的正是
+            setTheme 之后的主题属性 —— 本主题在 pre-31 上完全根治。
+         深色值 #0e0e10 与前端 data-theme=dark 的主界面底色同值。 -->
+    <style name="AppTheme.NoActionBarLaunchDark" parent="Theme.SplashScreen">
+        <item name="android:background">@color/splashBackgroundDark</item>
+        <item name="windowSplashScreenBackground">@color/splashBackgroundDark</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_blank</item>
+    </style>
+
+</resources>

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+（API 31）的系统级启动画面。
+     底色取 splashBackground(#e9dec6)，与前端 styles.css 里的封面底色同值。
+     **#60 起图标改成全透明的 ic_splash_blank** —— 系统开屏只留这一片暖米色，
+     与启动页（同为 #e9dec6 底）交接时完全无缝，封面再从这片米色里浮现。
+     （此前这里指向 ic_splash_icon：一枚悬空墨线稿。它与启动页的纸块封面形态不同、
+      屏上尺寸差 2.7 倍、垂直中心也差一截，200ms 交叉淡出时互相打架，
+      看着就是「卡了一帧」。完整推演见 drawable/ic_splash_blank.xml 的注释。）
+     本文件补 API 31+ 那一层；
+     pre-31 由 androidx core-splashscreen 的兼容实现接管，它读的是
+     values/styles.xml 里的同名属性 —— 两处必须同值，改一处就要改另一处。
+
+     ⚠️ 图标规格两套，差 2.67 倍，**不能混用**（曾经混用，于是开屏第一帧是糊的）。
+     这是说 ic_splash_icon.png（288dp 画布；现已被 ic_splash_blank 取代、素材保留备用）
+     与 launcher 图标（108dp 画布）的区别。万一改回带图标的开屏，务必仍指向 288dp 那张：
+       · launcher 自适应图标 = 108dp 画布 → mipmap-*/ic_launcher_foreground.png（xxxhdpi 432px）
+       · 系统开屏图标       = 288dp 画布 → drawable-*/ic_splash_icon.png（xxxhdpi 1152px）
+     官方规格：不含图标背景的应用图标必须为 288×288 dp，内容限在直径 192dp 内。
+     若误指向 launcher 那张（432px），系统会把它按 288dp 渲染 = 放大 2.67 倍，
+     线条发虚、边缘起毛 —— 这正是「点开 App 第一帧很模糊」的根因。
+     ic_splash_icon 由 gen_cover_assets.py 产出（见 SPLASH_ICON_DP 常量），
+     改完记得重跑该脚本 + 出包；verify_launch.py 会核对这两个 styles.xml 的引用。 -->
+<resources>
+    <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
+        <item name="android:background">@drawable/splash</item>
+        <item name="windowSplashScreenBackground">@color/splashBackground</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_blank</item>
+    </style>
+
+    <!-- #69：深色开屏变体（与 values/styles.xml 里的同名主题同值，两处必须一起改）。
+         API 31+ 的 starting window 底色由 system_server 静态绘制、改不了运行时值，
+         本主题在 31+ 上让应用窗口底色跟随 App 内深色主题（见基础主题的注释）。 -->
+    <style name="AppTheme.NoActionBarLaunchDark" parent="Theme.SplashScreen">
+        <item name="android:background">@color/splashBackgroundDark</item>
+        <item name="windowSplashScreenBackground">@color/splashBackgroundDark</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_blank</item>
+    </style>
+</resources>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App 图标的自适应背景色：白卡（#FFFFFF）。前景是中性灰线稿（摊开的书 + 一张脸），
+         与开屏图 / 启动动画里的封面同源 —— 见 gen_cover_assets.py。
+         取值必须等于该脚本的 PAPER 常量（由 verify_palette.py 核）。 -->
+    <color name="ic_launcher_background">#FFFFFF</color>
+</resources>

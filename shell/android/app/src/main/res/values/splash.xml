@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 开屏画面底色（暖米底 #e9dec6）。必须与前端 styles.css 里的封面底色自定义属性
+         （cover-bg）同值；不同值就会在「系统开屏 → 前端启动动画」的交接处闪一下色差。
+         （注意：XML 注释里不能出现两个连着的中划线，所以这里不写 CSS 的
+         自定义属性前缀，只写属性名。）
+         由 gen_cover_assets.py 的 BG 常量负责产出后两者。
+         本套：白卡图标 #ffffff / 中性灰线 #9a9a9a / 暖米底 #e9dec6（启动页底色）。 -->
+    <color name="splashBackground">#e9dec6</color>
+    <!-- #69：深色主题的开屏底色（values-night 的 splashBackground 同值，系统深色兜底；
+         App 内「深色模式」开关则由 MainActivity 读 ThemeStore 存储动态选主题）。
+         #0e0e10 与前端深色主题的主界面底色（data-theme=dark 的 bg 变量）同值。 -->
+    <color name="splashBackgroundDark">#0e0e10</color>
+    <!-- #102：内容期的窗口 / 状态栏底色。浅色值必须与前端 app.js 里
+         syncNativeStatusBar() 的浅色状态栏色（#f7f6f3）以及主界面内容底色同值。
+         用它的地方见 values/styles.xml 的 AppTheme.NoActionBar 注释：
+         原先内容期主题没给窗口背景，后台「最近任务」卡片顶部（系统栏遮挡段，
+         由窗口背景填充）就露出开屏的暖米色 #e9dec6，成为一条异色带。
+         深色值由 values-night/splash.xml 覆盖（同名）。 -->
+    <color name="appWindowBackground">#f7f6f3</color>
+    <!-- #102：内容期底色的深色版。刻意放在基础 values（不带 night 限定）——
+         它服务的不是「系统深色」，而是「App 内深色开关」（MainActivity 读 ThemeStore 决定），
+         资源限定符做不到这件事，所以由 Java 侧显式选用。
+         与 values-night 的同名 appWindowBackground 同值，三处 #0e0e10 保持一致。 -->
+    <color name="appWindowBackgroundDark">#0e0e10</color>
+</resources>

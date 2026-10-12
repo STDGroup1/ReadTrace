@@ -1,0 +1,9 @@
+{
+  "name": "rt-api",
+  "version": "1.0.0",
+  "description": "阅迹 ReadTrace 后端：账号、邀请码、恢复码与数据同步",
+  "main": "index.js",
+  "dependencies": {
+    "@cloudbase/node-sdk": "^2.9.0"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "versionCode": 1,
+  "versionName": "1.0",
+  "apkUrl": "PUT_YOUR_APK_URL_HERE",
+  "releasedAt": "2026-01-01",
+  "notes": [
+    "自部署的第一版"
+  ]
+}

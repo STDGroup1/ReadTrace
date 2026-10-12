@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- #69：系统深色模式（uiMode=night）下的开屏底色兜底。
+     MainActivity 读 ThemeStore 存储里 App 内的「深色模式」开关动态选主题；
+     这里管的是「App 内没写过主题（首次安装）且系统处于深色模式」的组合 ——
+     此时 Activity 用基础 Launch 主题，@color/splashBackground 解析到本文件的深色值。
+     浅色值（#e9dec6）仍由 values/splash.xml 提供，两处同改。 -->
+<resources>
+    <color name="splashBackground">#0e0e10</color>
+    <!-- #102：深色模式下的内容期窗口 / 状态栏底色，与前端 data-theme=dark 的主界面
+         底色、以及 syncNativeStatusBar() 的深色状态栏色（#0e0e10）同值。
+         与 values/splash.xml 的同名值成对，改一处必须改另一处。 -->
+    <color name="appWindowBackground">#0e0e10</color>
+</resources>

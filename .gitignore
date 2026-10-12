@@ -1,0 +1,12 @@
+# 出包产物 / 本机件 / 密钥 —— 都不进版本库
+node_modules/
+dist/
+*.apk
+*.keystore
+keystore.properties
+local.properties
+cloud/.env
+cloud/.env.local
+cloud/functions/rt-api/version.json
+.DS_Store
+Thumbs.db

@@ -1,0 +1,28 @@
+{
+  "appId": "com.example.readtrace",
+  "appName": "阅迹",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": false,
+    "captureInput": false,
+    "webContentsDebuggingEnabled": false,
+    "zoomEnabled": false
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 300,
+      "launchAutoHide": false,
+      "backgroundColor": "#e9dec6",
+      "launchFadeOutDuration": 400,
+      "androidScaleType": "CENTER_CROP",
+      "showSpinner": false
+    },
+    "Keyboard": {
+      "resize": "native",
+      "resizeOnFullScreen": false
+    }
+  }
+}

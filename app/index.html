@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#f1f3f7">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<!-- iOS：加到主屏后图标底下只叫「阅迹」（不写的话取页面标题，会被截成看不懂的串）；
+     数据探测器关掉，免得日记里的日期 / 计数被 Safari 自动链成电话号码。
+     ⚠️ 这两条注释里别写尖括号标签字样 —— build_editable.py 靠匹配 title 标签注入横幅。 -->
+<meta name="apple-mobile-web-app-title" content="阅迹">
+<meta name="format-detection" content="telephone=no">
+<title>阅迹 ReadTrace</title>
+<link rel="icon" href="assets/cover.png?v=114">
+<link rel="apple-touch-icon" href="assets/cover.png?v=114">
+<link rel="stylesheet" href="styles.css?v=114">
+</head>
+<body data-theme="light">
+
+<div class="stage">
+  <div class="stage-side">
+    <div class="side-brand">阅迹 <em>ReadTrace</em></div>
+    <h2>让每一次阅读<br>都留下痕迹。</h2>
+    <p>HTML 交互原型 · 六大功能区 · 零依赖离线可用</p>
+    <ul class="side-tips">
+      <li><b>⌘K / Ctrl+K</b> 唤起命令面板，检索书、笔记、角色碑</li>
+      <li><b>点击</b>任意书封面，体验粒子汇聚与翻页</li>
+      <li>右上角色块按钮可切换<b>深色模式</b></li>
+    </ul>
+  </div>
+
+  <!-- ============ 设备 ============ -->
+  <div class="device">
+    <div class="screen">
+      <div class="statusbar">
+        <span class="st-time" id="stTime">9:41</span>
+        <span class="st-right">
+          <svg viewBox="0 0 18 12" width="17" height="11"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="4.6" y="5.6" width="3" height="6.4" rx="1"/><rect x="9.2" y="3" width="3" height="9" rx="1"/><rect x="13.8" y="0" width="3" height="12" rx="1"/></svg>
+          <svg viewBox="0 0 16 12" width="16" height="11"><path d="M8 10.6 5.7 8a3.3 3.3 0 0 1 4.6 0z"/><path d="M8 6.2a6.1 6.1 0 0 0-4.3 1.8L2.4 6.6a8.1 8.1 0 0 1 11.2 0l-1.3 1.4A6.1 6.1 0 0 0 8 6.2z"/><path d="M8 2.4A10.4 10.4 0 0 0 .6 6.1L-.7 4.7a12.4 12.4 0 0 1 17.4 0l-1.3 1.4A10.4 10.4 0 0 0 8 2.4z"/></svg>
+          <span class="battery"><i style="width:78%"></i></span>
+        </span>
+      </div>
+
+      <!-- ============ 页面容器 ============ -->
+      <main class="pages">
+
+        <!-- ---------- 书架 ---------- -->
+        <section class="page is-active" data-page="shelf">
+          <header class="pg-head">
+            <div class="pg-title-row">
+              <h1 class="pg-title">书架</h1>
+              <span class="pg-badge" id="shelfCount">12</span>
+              <!-- #191：新增入口回到页头右上角（原先那颗右下角悬浮加号 #shFab 已删）——
+                   见文件末尾那段「两颗悬浮加号都撤了」的说明。 -->
+              <button class="pg-add" id="shNew" type="button" aria-label="添加书籍">
+                <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+                  <path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
+                </svg>
+              </button>
+            </div>
+            <p class="pg-sub" id="shelfSub">3 本在读 · 今年已读完 18 本</p>
+            <!-- #58 先删了搜索框（点开命令面板）与其余三格筛选、只留「已读」一格；#94 连它
+                 也一并撤掉（用户：「不需要已读，只需要书架」）。#206 用户点名把状态筛选要
+                 回来 —— 只恢复「状态」这一格（全部 / 在读 / 已读），搜索框与命令面板不回来。
+                 书架摆的仍是全部「实体书」（在读 + 已读），想读的不上架；这一格只在实体书
+                 里再切一刀，不动上架规则（见 app.js 的 shelfBooks()）。
+                 #191：新增按钮在标题那一行的右上角（#shNew）。 -->
+            <div class="segmented" id="shelfFilter" role="group" aria-label="按阅读状态筛选">
+              <button class="seg is-on" data-filter="all" type="button">全部</button>
+              <button class="seg" data-filter="reading" type="button">在读</button>
+              <button class="seg" data-filter="done" type="button">已读</button>
+            </div>
+          </header>
+          <!-- #116：视频同款木书架 —— 柜子永远摆满层（没书就是五层空层，不再有指引文案），
+               柜内独立滚动，底部一根可拖的滑动条在手机屏幕里上下滑着看整柜。 -->
+          <div class="shelf-scroll" id="shelfScroll">
+            <div class="cabinet" id="shelfGrid"></div>
+            <!-- #206 筛到空：柜子照摆（空柜五层是 #116 的既有观感），只在柜面上压一句说明
+                 —— 挂在柜外（柜体横向 260% 宽，挂进去会被裁），文案由 app.js 写。 -->
+            <div class="shelf-none" id="shelfNone" hidden></div>
+            <!-- #201 长按拖书的落点预告缝：挂在柜外的滚动口里（跟着内容一起滚），
+                 left/top/height 全由 JS 按内容坐标现场写（见 app.js showDragGap）。 -->
+            <div class="drag-gap" id="dragGap" aria-hidden="true"></div>
+          </div>
+          <div class="shelf-slider" id="shelfSlider" hidden>
+            <div class="ss-track" id="shelfSliderTrack">
+              <div class="ss-thumb" id="shelfThumb"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ---------- 记录（日记） ---------- -->
+        <section class="page" data-page="record">
+          <!-- 顶部条：居中标题 + 右侧「写一条」入口。
+               与其余五页的左侧大标题不同 —— 参考版式要求居中窄条导航；
+               玻璃材质与 sticky 行为保持一致，不引入新的材质语言。 -->
+          <header class="pg-head tl-head">
+            <div class="tl-bar">
+              <span class="tl-bar-pad" aria-hidden="true"></span>
+              <h1 class="tl-bar-title">日记</h1>
+              <button class="pg-add" id="tlNew" type="button" aria-label="写一条日记">
+                <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true">
+                  <path d="M13.4 3.1 16.9 6.6 7.5 16 3.2 17.1 4.3 12.8z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+                </svg>
+              </button>
+            </div>
+
+            <!-- 视图切换：列表 = 按天分组的日记本体，日历 = 月历直接铺在页面上。
+                 原先「年份胶囊 + 整屏日历浮层」是两套入口做同一件事，现在收成一个 seg；
+                 日历也不必先点按钮才看得见 —— 打开就是「哪天写了」的样子。 -->
+            <div class="tl-nav-bar">
+              <div class="segmented" id="recView">
+                <button class="seg is-on" data-recview="list" type="button">列表</button>
+                <button class="seg" data-recview="cal" type="button">日历</button>
+              </div>
+            </div>
+          </header>
+
+          <!-- 封面卡（#161，用户 2026-10-09 定）：这张大卡片改成**用户自己上传的图片**
+               （原来那套程序生成的风景底图 + 大字「周五 25」+ 最近七天周条 + 右上圆钮
+               一并去掉）。框里只留左上角一行完整日期。
+               点卡片 = 换一张图（隐藏 input `heroPhoto` 在页尾，与书封面那两个并排）。
+               写在列表**外面**：renderRecord 是整段 innerHTML 重建，放里面会被连带重建。
+               日历视角下与 #timeline 一起收起（setRecView）。 -->
+          <div class="tl-hero" id="tlHero" role="button" tabindex="0"
+               aria-label="封面图，点击更换">
+            <img class="tl-hero-img" id="tlHeroImg" alt="" draggable="false">
+            <div class="tl-hero-top">
+              <span class="tl-hero-pill" id="tlHeroPill"></span>
+              <button class="tl-hero-del" id="tlHeroDel" type="button"
+                      aria-label="移除封面图">移除</button>
+            </div>
+          </div>
+
+          <div class="tl" id="timeline"></div>
+
+          <!-- 日历视角（不再走整屏浮层）。
+               带点的日子 = 写过日记；点某天在下方直接列出那天的内容，不跳走 ——
+               「什么时候写了」变成一个平视就能看到的动作。
+               点月导航中间的「2026 年 9 月」开年份网格：与写日记抽屉共用
+               同一个 yearGridHTML()，不再有第二套实现。 -->
+          <div class="rec-cal" id="recCal" hidden>
+            <div class="rc-head">
+              <button class="rc-nav is-jump" id="rcPrevY" type="button" aria-label="上一年">«</button>
+              <button class="rc-nav" id="rcPrev" type="button" aria-label="上个月">‹</button>
+              <button class="rc-title" id="rcTitle" type="button" aria-expanded="false">2026 年 9 月</button>
+              <button class="rc-nav" id="rcNext" type="button" aria-label="下个月">›</button>
+              <button class="rc-nav is-jump" id="rcNextY" type="button" aria-label="下一年">»</button>
+            </div>
+            <div class="rc-week" id="rcWeek" aria-hidden="true"></div>
+            <div class="rc-grid" id="rcGrid"></div>
+            <div class="rc-ygrid" id="rcYGrid" hidden></div>
+            <div class="rc-day" id="rcDay"></div>
+          </div>
+
+          <div class="pad-bottom"></div>
+        </section>
+
+        <!-- ---------- 互动 · 写信与收信（#77） ----------
+             原先这里是「碑林 + 想你榜」：一人一碑、碑前点「想你了」、点碑进去写信。
+             #77 起按用户要求只留两件事 —— 写信、收信：这一页就是收件箱，
+             写信走右下角的加号。回信**不在本地生成**：寄出后信件停在「等待回信」，
+             由服务端产出（rt-api 的 replyEngine，将来可换成内置模型），
+             随下一次同步送达 —— 于是「寄出 → 等一会儿 → 回信来了」是天然成立的。 -->
+        <section class="page" data-page="interact">
+          <header class="pg-head">
+            <div class="pg-title-row"><h1 class="pg-title">互动</h1><span class="pg-badge" id="inboxCount">0</span>
+              <!-- #191：写信入口回到页头右上角（原先那颗右下角悬浮加号 #ltFab 已删） -->
+              <button class="pg-add" id="ltNew" type="button" aria-label="写一封信">
+                <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+                  <path d="M12 5v14M5 12h14" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
+                </svg>
+              </button>
+            </div>
+            <p class="pg-sub">写给书里的人，回信会来</p>
+          </header>
+          <div class="inbox-wrap" id="inboxList"></div>
+          <div class="pad-bottom"></div>
+        </section>
+
+        <!-- ---------- 书单 ---------- -->
+        <section class="page" data-page="booklist">
+          <header class="pg-head">
+            <div class="pg-title-row"><h1 class="pg-title">书单</h1></div>
+            <p class="pg-sub">自己攒的集子 —— 从书架里挑书收进来</p>
+          </header>
+          <div class="list-wrap" id="bookLists"></div>
+          <div class="pad-bottom"></div>
+        </section>
+
+        <!-- ---------- 我的 ----------
+             沉浸头部 + 阅读足迹 + 快捷胶囊 + iOS 分组设置（#136：数据带并入阅读足迹，撤独立数据带）。
+             头部随内容滚走（#182 起不再有接管的吸顶标题栏）；头像区只留 头像 / 昵称 / 同步状态。
+             名字显示口径见 app.js meNick()：昵称优先，没设过显示「读者」，不再用邮箱前缀顶名字位。 -->
+        <section class="page" data-page="me">
+          <!-- #182：原先这里还有一条零高 sticky 的玻璃标题栏（.me-sticky/.me-topbar），
+               滚过沉浸头部后淡入接管「我的」。它用 --glass，而本页底是香槟金渐变（不是 --bg），
+               于是渲染成一块中性灰横带 —— 用户 2026-10-10 点名要去掉，整条已删。 -->
+          <header class="me-hero" id="meIdBlock" role="button" tabindex="0" aria-label="账号">
+            <button class="me-edit" id="meEdit" type="button" hidden>编辑</button>
+            <div class="avatar" id="avatar">阅</div>
+            <h1 class="me-nick" id="meName">未登录</h1>
+            <p class="me-sig" id="meSig" hidden></p>
+            <p class="me-sub" id="meSub">点此登录或注册</p>
+          </header>
+          <!-- 阅读足迹（#136）：renderFootprint 实算 —— 日记累计（整行）+ 篇日记/本书/封信/册书单，
+               点格子跳对应页。四个计数原先在独立的「数据带」里，与「本书」和足迹重复，已并入此处 -->
+          <div id="meFoot"></div>
+
+          <!-- 快捷动作（#132）：玻璃胶囊；帮助与反馈开一张小浮层，不依赖邮件客户端 -->
+          <div class="pillbar" id="mePills">
+            <button class="pillbtn" data-act="share" type="button"><span class="pill-ico is-green">↗</span><b>推荐给朋友</b></button>
+            <button class="pillbtn" data-act="help" type="button"><span class="pill-ico is-blue">✎</span><b>帮助与反馈</b></button>
+          </div>
+
+          <!-- 发现新版本时才由 renderUpdateCard() 填内容，平时是空的 -->
+          <div id="updCard"></div>
+
+          <div class="set-list" id="setList"></div>
+          <div class="pad-bottom"></div>
+        </section>
+      </main>
+
+      <!-- ============ TabBar（#205：五个卡通形象 → 极简毛玻璃圆形框）============
+           原先 5 只从视频逐帧提取的 APNG 形象（app/assets/tab-<名>.png）连同它们的
+           分层生成脚本一起退役；现在每格是一枚 52px 的毛玻璃圆框，里头一枚 23px 的
+           线性图标 —— **内联 SVG**，零素材、零体积，也不再有任何待机动画/关键帧。
+           图标一律 stroke=currentColor，颜色随 .tab-orb 的 color 走（选中翻实心 --ink）。
+           映射不变：书架 / 记录 / 互动 / 书单 / 我的。 -->
+      <nav class="tabbar" id="tabbar">
+        <button class="tab is-on" data-tab="shelf" type="button" aria-label="书架">
+          <span class="tab-orb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 6.7C10.3 5.5 7.7 5.2 4.7 5.8v11.7c3-.6 5.6-.3 7.3.9 1.7-1.2 4.3-1.5 7.3-.9V5.8c-3-.6-5.6-.3-7.3.9Z"/><path d="M12 6.7v11.7"/></svg></span>
+        </button>
+        <button class="tab" data-tab="record" type="button" aria-label="记录">
+          <span class="tab-orb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.7 19.3l.93-3.63 9.03-9.03a2.36 2.36 0 0 1 3.34 3.34l-9.03 9.03z"/><path d="M13.9 7.7l2.4 2.4"/></svg></span>
+        </button>
+        <button class="tab" data-tab="interact" type="button" aria-label="互动">
+          <span class="tab-orb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.3 11.6c0 4.1-3.7 7.4-8.3 7.4-1.1 0-2.1-.2-3.1-.5l-4.3 1.6 1.4-3.5c-1-1.2-1.6-3.1-1.6-5 0-4.1 3.7-7.4 8.3-7.4s7.6 3.3 7.6 7.4Z"/></svg></span>
+        </button>
+        <button class="tab" data-tab="booklist" type="button" aria-label="书单">
+          <span class="tab-orb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.2 6.2h11M9.2 12h11M9.2 17.8h11"/><path d="M4.6 6.2h.01M4.6 12h.01M4.6 17.8h.01"/></svg></span>
+        </button>
+        <button class="tab" data-tab="me" type="button" aria-label="我的">
+          <span class="tab-orb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8.4" r="3.7"/><path d="M4.9 19.8c1.4-3.5 4-5.4 7.1-5.4s5.7 1.9 7.1 5.4"/></svg></span>
+        </button>
+      </nav>
+
+      <div class="homebar"><span></span></div>
+
+      <!-- ============ 浮层 ============ -->
+      <!-- 书籍详情 -->
+      <div class="sheet" id="bookSheet" role="dialog" aria-modal="true" aria-label="书籍详情" aria-hidden="true">
+        <div class="sheet-scrim" data-close-sheet></div>
+        <div class="sheet-body" id="bookSheetBody"></div>
+      </div>
+
+      <!-- 书目编辑浮层：新增 / 修改 / 删除共用同一张表。
+           scrim 用 .plain —— 不加 backdrop-filter，性能结论见工作日志 #12 / #21。 -->
+      <div class="sheet" id="bookEdit" role="dialog" aria-modal="true" aria-label="编辑书籍" aria-hidden="true">
+        <div class="sheet-scrim plain" data-edit-close></div>
+        <div class="sheet-body" id="bookEditBody"></div>
+      </div>
+
+      <!-- 写一封信（#77）：选一个人物 → 写 → 寄出。
+           沿用 .sheet 的进出手感（与书籍详情同一个动作语言），
+           但不用它的背景模糊 —— backdrop-filter 是本项目帧率的主要成本，
+           新增浮层一律不引入（见工作日志 #12 / #21 的性能结论）。 -->
+      <div class="sheet" id="composeSheet" role="dialog" aria-modal="true" aria-label="写一封信" aria-hidden="true">
+        <div class="sheet-scrim plain" data-compose-close></div>
+        <div class="sheet-body cmp-body" id="composeBody"></div>
+      </div>
+
+      <!-- 书单详情浮层（#57 起书单由用户自建）：名字与简介就地可改，下面逐行列书目。
+           与书籍编辑同一个动作语言，scrim 也用 .plain（不引 backdrop-filter）。 -->
+      <div class="sheet" id="listSheet" role="dialog" aria-modal="true" aria-label="书单详情" aria-hidden="true">
+        <div class="sheet-scrim plain" data-close-lsheet></div>
+        <div class="sheet-body" id="listSheetBody"></div>
+      </div>
+
+      <!-- 往书单里加书：勾选式的书架清单。刻意排在 listSheet 之后 ——
+           两张浮层 z-index 同为 40，靠 DOM 顺序决定谁在上面（实际用不叠：
+           打开它之前会先收起 listSheet，见 openListSheet）。 -->
+      <div class="sheet" id="listPick" role="dialog" aria-modal="true" aria-label="加入书籍" aria-hidden="true">
+        <div class="sheet-scrim plain" data-close-lpick></div>
+        <div class="sheet-body" id="listPickBody"></div>
+      </div>
+
+      <!-- 编辑资料（#122）：签名 / 头像 / 邮箱只读，body 由 openProfSheet() 填。
+           scrim 用 .plain —— 不引 backdrop-filter（#12 / #21 的性能结论，新增浮层一律遵守）。 -->
+      <div class="sheet" id="profSheet" role="dialog" aria-modal="true" aria-label="编辑资料" aria-hidden="true">
+        <div class="sheet-scrim plain" id="profMask"></div>
+        <div class="sheet-body prof-body" id="profBody"></div>
+      </div>
+
+      <!-- 关于阅迹（#132）：slogan / 版本 / 导出阅读数据 / 隐私与协议，body 由 openAboutSheet() 填。
+           scrim 用 .plain；「导出阅读数据」行从设置组移到这里（#132），行文案不变，探针改按浮层找行。 -->
+      <div class="sheet" id="aboutSheet" role="dialog" aria-modal="true" aria-label="关于阅迹" aria-hidden="true">
+        <div class="sheet-scrim plain" id="aboutMask"></div>
+        <div class="sheet-body about-body" id="aboutBody"></div>
+      </div>
+
+      <!-- 帮助与反馈（#132）：三条常见问题 + 「问题反馈」/「隐私与协议」两个入口，
+           body 由 openHelpSheet() 填。scrim 用 .plain。 -->
+      <div class="sheet" id="helpSheet" role="dialog" aria-modal="true" aria-label="帮助与反馈" aria-hidden="true">
+        <div class="sheet-scrim plain" id="helpMask"></div>
+        <div class="sheet-body about-body" id="helpBody"></div>
+      </div>
+
+      <!-- 问题反馈（#193）：写文字 + 选最多 3 张图 + 留下自己的邮箱，发到开发者邮箱。
+           入口只有帮助面板里那一行（用户 2026-10-10 要的就是"软件里那个反馈"）；
+           body 由 openFbSheet() 填 —— **每次开都重画**，所以收起即整份取消（草稿不落盘）。
+           返回键先收它，见 closeTopOverlay 的 layers 表（新增浮层的红线，§1.2）。 -->
+      <div class="sheet" id="fbSheet" role="dialog" aria-modal="true" aria-label="问题反馈" aria-hidden="true">
+        <div class="sheet-scrim plain" id="fbMask"></div>
+        <div class="sheet-body about-body fb-body" id="fbBody"></div>
+      </div>
+
+      <!-- 阅读器（翻页）与「翻开这本书」的粒子启动动画已整体删除：
+           阅迹是读书记录，不是阅读器（书目不再带正文）。别加回。 -->
+
+      <!-- 三颗悬浮加号都撤了（#190 日记页那颗、#191 书架与互动那两颗）——
+           **新增入口一律在各自页头的右上角**（`.pg-add`：书架 #shNew / 互动 #ltNew /
+           记录页那颗笔 #tlNew）。原先那两颗浮在内容右下角，会压住底下的东西：
+           #191 实测互动页滚到底时，最后一封信的「删除」正好在加号底下（带手势条的机型上
+           整颗被盖住，点下去开的是写信面板）。**别再往右下角加浮层**；真要加，
+           先按 `_probe190_fab_occl.js` 量一遍「加号正下方是谁」。
+           `syncFabs()` 也随之下岗（没有互斥可言了）。 -->
+
+      <!-- 写一条 · 全屏书写页（#111）
+           入口只有日记页页头右上角那一颗（#190 起；原先右下角的悬浮加号已删）。
+           原先是底部抽屉，现在按 iOS 备忘录的做法铺满整屏：顶栏（关闭 + 字数 + 保存）、
+           日期行（胶囊 + 今天/昨天）、可折叠月历、下面一整块书写区。
+           （#57 起随笔是纯备忘录 —— 书籍详情里的「记一笔」已删除；放在 .pages 之外，
+           避免被 .page 的 overflow/transform 裁切。） -->
+      <div class="tl-composer" id="tlComposer" role="dialog" aria-label="写日记" aria-hidden="true">
+        <div class="tlc-scrim" data-compose-close></div>
+        <div class="tlc-panel">
+          <!-- #202：顶上那根灰条 —— 与写信面板（.sheet-grab）同一根，按住下拖 = 收起
+               （与返回箭头同一路 closeComposer：草稿照旧留）。样式与拖拽接线见
+               styles.css .tlc-panel 段与 app.js setupTlcGrab。 -->
+          <div class="sheet-grab" id="tlcGrab" aria-hidden="true"></div>
+          <!-- 顶栏：返回（左）· 撤销 / 重做 / 完成 ✓（右）—— 备忘录同款（#114）。
+               ✓ 即保存：落款日期随补记变化，写进 aria-label（读屏与探针都读它）。 -->
+          <div class="tlc-top">
+            <button class="tlc-icon-btn" data-compose-close type="button" aria-label="返回">
+              <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+                <path d="M19 12H5M11 18l-6-6 6-6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+            <div class="tlc-acts">
+              <button class="tlc-icon-btn" id="tlcUndo" type="button" aria-label="撤销">
+                <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                  <path d="M9 14 4 9l5-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M4 9h9.5A6.5 6.5 0 0 1 20 15.5V17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                </svg>
+              </button>
+              <button class="tlc-icon-btn" id="tlcRedo" type="button" aria-label="重做">
+                <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                  <path d="m15 14 5-5-5-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M20 9h-9.5A6.5 6.5 0 0 0 4 15.5V17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                </svg>
+              </button>
+              <button class="tlc-icon-btn is-done" id="saveNote" type="button" aria-label="保存">
+                <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+                  <path d="M4.5 12.5 10 18 19.5 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- 元信息行：落款日期 · 字数（备忘录同款的小灰字）。整行可点 —— 点开月历
+               换补记日期（#112 起补记统一走月历）。 -->
+          <button class="tlc-meta" id="cpDateBtn" type="button" aria-expanded="false">
+            <span id="cpDateTxt">今天</span>
+            <span class="tlc-meta-sep" aria-hidden="true">·</span>
+            <span id="noteCount">0 字</span>
+          </button>
+
+          <!-- 月历：cover 式折叠（max-height 过渡），未来日期不可点。
+               标题上的年份可点开「年网格」—— 补记到几年前不必连点几十次「上个月」。 -->
+          <div class="tlc-cal" id="cpCal" aria-hidden="true">
+            <div class="tlc-cal-head">
+              <button class="tlc-cal-nav is-jump" id="calPrevYr" type="button" aria-label="上一年">«</button>
+              <button class="tlc-cal-nav" id="calPrev" type="button" aria-label="上个月">‹</button>
+              <button class="tlc-cal-title" id="calTitle" type="button" aria-expanded="false">2026 年 9 月</button>
+              <button class="tlc-cal-nav" id="calNext" type="button" aria-label="下个月">›</button>
+              <button class="tlc-cal-nav is-jump" id="calNextYr" type="button" aria-label="下一年">»</button>
+            </div>
+            <div class="tlc-cal-grid" id="calGrid"></div>
+          <!-- #119：「写完 → 选日期」步骤的提示行；平时预选日期时不显示。 -->
+          <div class="calp-hint" id="cpCalHint" hidden></div>
+          <div class="tlc-ygrid" id="calYGrid" hidden></div>
+          </div>
+
+          <!-- 书写区：flex:1 吃掉剩余全部空间（iOS 备忘录式），长文在框内滚。
+               单篇上限 99999 字（#113 用户定的）：maxlength 挡住输入与粘贴，
+               脚本在保存时再挡一道（防程序赋值绕过）。 -->
+          <textarea class="note-input" id="noteInput" rows="3" maxlength="99999" placeholder="写下此刻的想法…"></textarea>
+        </div>
+      </div>
+
+      <div class="toast" id="toast"></div>
+
+      <!-- ===== 账号：登录 / 注册 / 找回密码 ===== -->
+      <div class="auth-sheet" id="authSheet" role="dialog" aria-modal="true" aria-label="账号">
+        <div class="auth-mask" id="authMask"></div>
+        <div class="auth-panel">
+          <button class="auth-close" id="authClose" type="button" aria-label="关闭">✕</button>
+          <h2 class="auth-title" id="authTitle">登录</h2>
+          <p class="auth-sub" id="authSub">邮箱 + 密码</p>
+          <!-- 本机免密（#171）：与登录门上那条是同一件事，给「设置里点登录 / 会话刚过期」用 -->
+          <div class="auth-dev" id="authDevWrap" hidden>
+            <button class="auth-devbtn" id="authDevGo" type="button">一键进入</button>
+            <p class="auth-devmail" id="authDevMail"></p>
+          </div>
+          <div class="auth-field"><input id="authEmail" type="email" inputmode="email" autocomplete="username" placeholder="邮箱"></div>
+          <div class="auth-field"><input id="authPwd" type="password" autocomplete="current-password" placeholder="密码（至少 6 位）"></div>
+          <div class="auth-field" id="authInviteWrap" hidden><input id="authInvite" type="text" placeholder="邀请码"></div>
+          <div class="auth-field" id="authRcWrap" hidden><input id="authRc" type="text" placeholder="恢复码  RT-RC-XXXX-XXXX-XXXX"></div>
+          <p class="auth-err" id="authErr"></p>
+          <p class="auth-ok" id="authOk"></p>
+          <button class="auth-submit" id="authSubmit" type="button">登录</button>
+          <div class="auth-links">
+            <button class="auth-link" id="authToRegister" type="button">没有账号？用邀请码注册</button>
+            <button class="auth-link" id="authToRecover" type="button">忘记密码</button>
+            <button class="auth-link" id="authToLogin" type="button" hidden>返回登录</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== 首启引导（#130）：登录门 → 恢复码 → 欢迎 → 称呼 → 头像 → 就绪 =====
+           未登录冷启动的必经之门（enterApp / init 钩子拉起）；登录成功的老用户
+           直接进主界面，注册成功的新用户走完整条链。六步同一屏内切换，只动
+           transform/opacity（合成器走查，高帧率）；玻璃质感 = 半透明底 + 描边 +
+           高光 + 柔影，不用 backdrop-filter（浮层红线）。
+           层级 z 76：盖住主界面与 authSheet(70)，让位给裁剪台(78)/合并(80)/确认(85)。 -->
+      <div class="obd" id="obd" role="dialog" aria-modal="true" aria-label="欢迎引导">
+        <div class="obd-glow" aria-hidden="true"></div>
+
+        <!-- ① 登录门（登录 / 注册 / 找回三模式同屏切换） -->
+        <section class="obd-step is-on" data-step="login">
+          <div class="obd-col">
+            <!-- 品牌标（#169）：原先是「阅」字，用户要求换图标 —— 用应用自己的图标
+                 cover.png（白卡圆角是烘进 PNG 的，四角透明）。 -->
+            <img class="obd-brand" src="assets/cover.png?v=114" alt="" width="68" height="68" draggable="false">
+            <h1 class="obd-h" id="obTitle">欢迎回来</h1>
+            <p class="obd-sub" id="obSub">邮箱 + 密码，数据跟着账号走。</p>
+            <!-- 本机免密（#171）：这台设备还留着凭据时才显示 —— 点一下就进来，不必输密码。
+                 没有凭据时整块 hidden，门与从前逐像素一致。 -->
+            <div class="obd-dev" id="obDevWrap" hidden>
+              <button class="obd-btn obd-devbtn" id="obDevGo" type="button">一键进入</button>
+              <p class="obd-devmail" id="obDevMail">上次登录的账号</p>
+              <p class="obd-devsep"><i></i><span>或 用密码登录</span><i></i></p>
+            </div>
+            <label class="obd-field"><span>邮箱</span>
+              <input id="obEmail" type="email" inputmode="email" autocomplete="username" placeholder="name@example.com"></label>
+            <label class="obd-field"><span>密码</span>
+              <input id="obPwd" type="password" autocomplete="current-password" placeholder="至少 6 位"></label>
+            <label class="obd-field" id="obInviteWrap" hidden><span>邀请码</span>
+              <input id="obInvite" type="text" autocomplete="off" placeholder="向管理员索取"></label>
+            <label class="obd-field" id="obRcWrap" hidden><span>恢复码</span>
+              <input id="obRc" type="text" autocomplete="off" placeholder="RT-RC-XXXX-XXXX-XXXX"></label>
+            <p class="obd-err" id="obErr" role="alert"></p>
+            <button class="obd-btn" id="obGo" type="button">登录</button>
+            <div class="obd-links">
+              <button class="obd-link" id="obToReg" type="button">没有账号？用邀请码注册</button>
+              <button class="obd-link" id="obToRec" type="button">忘记密码</button>
+              <button class="obd-link" id="obToLogin" type="button" hidden>返回登录</button>
+            </div>
+            <p class="obd-tiny">数据与你的账号绑定，只有你自己可见 · <button class="obd-tinylink" id="obPrivacy" type="button">隐私政策</button></p>
+          </div>
+        </section>
+
+        <!-- ② 恢复码：注册 / 重置成功后必看一步，明确「已保存」才放行
+             （老浮层是蓝条 2.6s 自动关，引导链里不能赌用户来得及截图） -->
+        <section class="obd-step" data-step="rc">
+          <div class="obd-col">
+            <h1 class="obd-h">保存好你的恢复码</h1>
+            <p class="obd-sub">忘记密码时，它是找回账号的唯一凭证。</p>
+            <div class="obd-rccard"><b id="obRcCode"></b></div>
+            <p class="obd-hint">它只显示这一次，请立刻截图或抄写。</p>
+            <button class="obd-btn" id="obRcGo" type="button">已保存，继续</button>
+          </div>
+        </section>
+
+        <!-- ③ 欢迎 -->
+        <section class="obd-step" data-step="welcome">
+          <div class="obd-col">
+            <div class="obd-art" aria-hidden="true">
+              <i class="obd-dot d1"></i><i class="obd-dot d2"></i><i class="obd-dot d3"></i><i class="obd-dot d4"></i>
+              <div class="obd-mark">📖</div>
+            </div>
+            <h1 class="obd-h">欢迎来到阅迹</h1>
+            <p class="obd-sub">记录你的每一页</p>
+            <button class="obd-btn" id="obWlGo" type="button">开始使用</button>
+          </div>
+        </section>
+
+        <!-- ④ 称呼（必填：空值时「继续」恒为禁用灰） -->
+        <section class="obd-step" data-step="nick">
+          <div class="obd-col">
+            <div class="obd-nav"><button class="obd-back" id="obNickBack" type="button" aria-label="返回">‹</button></div>
+            <h1 class="obd-h">怎么称呼你？</h1>
+            <p class="obd-sub">昵称会出现在「我的」页和导出的记录上，随时可改</p>
+            <input class="obd-nick" id="obNick" type="text" maxlength="12" autocomplete="nickname" value="小阅">
+            <p class="obd-hint">最长 12 个字</p>
+            <button class="obd-btn" id="obNickGo" type="button">继续</button>
+          </div>
+        </section>
+
+        <!-- ⑤ 头像（可选：右上角「跳过」）——选择面板与「我的」页共用 #avaWrap -->
+        <section class="obd-step" data-step="avatar">
+          <div class="obd-col">
+            <div class="obd-nav">
+              <button class="obd-back" id="obAvBack" type="button" aria-label="返回">‹</button>
+              <button class="obd-skip" id="obAvSkip" type="button">跳过</button>
+            </div>
+            <h1 class="obd-h">选个头像</h1>
+            <p class="obd-sub">可以先用 Emoji，以后再换</p>
+            <div class="obd-avrow">
+              <div class="obd-ava" id="obAva">阅</div>
+              <button class="obd-cam" id="obAvaPick" type="button" aria-label="选择头像">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+              </button>
+            </div>
+            <button class="obd-btn" id="obAvGo" type="button">继续</button>
+          </div>
+        </section>
+
+        <!-- ⑥ 就绪（对勾描边动画，播完点按钮进主界面） -->
+        <section class="obd-step" data-step="done">
+          <div class="obd-col">
+            <div class="obd-donewrap">
+              <svg class="obd-ck" viewBox="0 0 52 52" aria-hidden="true"><circle cx="26" cy="26" r="24"/><path d="M14.5 27l8 8 15-16"/></svg>
+              <h1 class="obd-h">一切就绪！</h1>
+              <p class="obd-sub">开始你的第一页记录吧</p>
+            </div>
+            <button class="obd-btn" id="obDoneGo" type="button">进入阅迹</button>
+          </div>
+        </section>
+      </div>
+
+      <!-- ===== 头像选择面板（#130）：首启引导与「我的」页编辑资料共用同一个 =====
+           action sheet **两页**：行菜单 / Emoji 格（#205 撤掉了「预设头像库」那一页）。
+           拍照与相册都汇进既有裁剪台（1:1 头像模式）；
+           Emoji 格选中那格打绿勾，与照片头像走完全同一条管线。
+           层级 z 77：在引导层(76)与资料浮层之上，让位给裁剪台(78)。 -->
+      <div class="ava-wrap" id="avaWrap" aria-hidden="true">
+        <div class="ava-dim" id="avaDim"></div>
+        <div class="ava-sheet" id="avaSheet" role="dialog" aria-label="设置头像">
+          <div class="ava-page is-on" data-ava-page="rows">
+            <div class="ava-head">设置头像</div>
+            <button class="ava-row" data-ava-act="emoji" type="button">使用 Emoji</button>
+            <button class="ava-row" data-ava-act="camera" type="button">拍照</button>
+            <button class="ava-row" data-ava-act="album" type="button">从相册选择</button>
+            <button class="ava-row is-cancel" data-ava-act="cancel" type="button">取消</button>
+          </div>
+          <div class="ava-page" data-ava-page="emoji">
+            <div class="ava-subhead"><button class="ava-back" id="avaEmoBack" type="button" aria-label="返回">‹</button>选择 Emoji</div>
+            <div class="ava-grid" id="avaEmoGrid"></div>
+          </div>
+        </div>
+        <input type="file" id="avaCam" accept="image/*" capture="environment" hidden>
+        <input type="file" id="avaFile" accept="image/*" hidden>
+      </div>
+
+      <!-- ===== 长按书脊浮出的玻璃「删除」（#200） =====
+           书脊只有二十来像素宽，胶囊塞不进去；柜体 overflow:hidden 也会把书顶上外溢的部分
+           裁掉 —— 所以挂在 .screen 这一层，由 JS 按书脊 rect 现场摆位（见 app.js 的
+           positionSpinePop）。z 44：盖在页面内容上、趴在确认弹窗（85）之下。
+           平时透明不接事件，长按亮起时才 is-on。 -->
+      <div class="spine-pop" id="shelfDelPop" aria-hidden="true">
+        <button class="spine-del" id="shelfDelBtn" type="button">删除</button>
+      </div>
+
+      <!-- ===== 写日记草稿询问（#201）：盘上有没写完的草稿时，点「写一条」先问一下 =====
+           胶囊玻璃的框 —— 与确认弹窗同一家族（同一副骨架：底色蒙层 + 居中胶囊面板）。
+           返回键 = 算了：不进书写页、草稿原样留着（接在 closeTopOverlay 的层表最前，
+           见 verify_backlayers 的「每个整屏浮层都必须在层表里」）。 -->
+      <div class="cfm-modal" id="draftAsk" role="dialog" aria-modal="true" aria-labelledby="daTitle">
+        <div class="cfm-mask" id="daMask"></div>
+        <div class="cfm-panel da-panel">
+          <h2 class="cfm-title" id="daTitle">有一篇没写完</h2>
+          <p class="cfm-body" id="daMeta"></p>
+          <div class="da-acts">
+            <button class="da-btn is-main" id="daBack" type="button">回到没写完的</button>
+            <button class="da-btn" id="daNew" type="button">新建一篇</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== 应用内确认弹窗（#62） =====
+           取代 window.confirm()：原生弹窗在 Android WebView 里是系统样式的
+           蓝色 CANCEL / OK，与这套暖纸色界面完全脱节。删书、删书单、退出登录、
+           注销账号四处破坏性确认都走这里。
+           层级 z 85：在合并弹窗（80）之上 —— 返回键一次关一层，见 closeTopOverlay。
+           点遮罩等于取消，按钮文案由 askConfirm 传入。 -->
+      <div class="cfm-modal" id="cfmModal" role="dialog" aria-modal="true" aria-labelledby="cfmTitle">
+        <div class="cfm-mask" id="cfmMask"></div>
+        <div class="cfm-panel">
+          <h2 class="cfm-title" id="cfmTitle"></h2>
+          <p class="cfm-body" id="cfmBody"></p>
+          <div class="cfm-acts">
+            <button class="cfm-btn" id="cfmNo" type="button">取消</button>
+            <button class="cfm-btn is-ok" id="cfmYes" type="button">确定</button>
+          </div>
+        </div>
+      </div>
+
+
+      <!-- ===== 首次登录：本机与云端数据三选一（防静默覆盖） ===== -->
+      <div class="merge-modal" id="mergeModal" role="dialog" aria-modal="true" aria-label="数据合并">
+        <div class="merge-panel">
+          <h2 class="merge-title">云端已有你的数据</h2>
+          <p class="merge-info" id="mergeInfo"></p>
+          <button class="merge-btn is-primary" id="mergeMerge" type="button">合并（推荐）</button>
+          <button class="merge-btn" id="mergeLocal" type="button">只用本机数据</button>
+          <button class="merge-btn" id="mergeCloud" type="button">只用云端数据</button>
+        </div>
+      </div>
+
+      <!-- ===== 合规页：隐私政策 / 用户协议（#62 起合成一行入口，页内分段切换） ===== -->
+      <div class="legal-page" id="legalPage">
+        <div class="legal-mask" id="legalMask"></div>
+        <div class="legal-shell">
+          <header class="pg-head">
+            <div class="pg-title-row">
+              <h1 class="pg-title" id="legalTitle">隐私政策</h1>
+              <button class="legal-close" id="legalClose" type="button" aria-label="关闭">✕</button>
+            </div>
+            <p class="pg-sub">阅迹 ReadTrace</p>
+          </header>
+          <!-- 段标题仍是当前文档名（#legalTitle），这里只负责切换 -->
+          <div class="legal-seg" id="legalSeg">
+            <button class="legal-seg-btn is-on" data-legal="privacy" type="button">隐私政策</button>
+            <button class="legal-seg-btn" data-legal="terms" type="button">用户协议</button>
+          </div>
+          <div class="legal-body" id="legalBody"></div>
+          <div class="pad-bottom"></div>
+        </div>
+      </div>
+
+      <!-- 启动页 · 画面＝软件封面（**静止图**，不再有入场动画）
+           assets/cover.png 这一张既是启动页的画面，也是网页版的 favicon。
+           它的底色与 CSS 的 --cover-bg 同值，所以封面块边缘与页面融在一起。
+           整套配色（白卡 #ffffff / 中性灰线 #9a9a9a / 暖米底 #e9dec6）的唯一来源是
+           gen_cover_assets.py —— 要换图 / 换色只改那里的常量再重跑。
+           #49 去掉 <video>；#205 起连 CSS 的入场缩放 / 文案淡入 / 三个脉冲点也一并去掉 ——
+           封面、文案、按钮都是**首帧即定稿**，只有跳出这一层的 opacity 过渡（.is-gone）。 -->
+      <div class="launch" id="launch">
+        <div class="launch-art">
+          <!-- id 保留（v1.94 复核后恢复）：app.js 零引用，但 verify_launch / verify_online13
+       两支探针按它定位封面 —— 别删，删了套件假红。 -->
+          <img class="launch-cover" id="launchCover" src="assets/cover.png?v=114"
+               alt="阅迹 · 封面" draggable="false">
+        </div>
+        <div class="launch-word">阅迹</div>
+        <div class="launch-sub">ReadTrace</div>
+        <button class="launch-btn" id="launchBtn" type="button">Get started</button>
+        <button class="launch-skip" id="launchSkip" type="button">跳过</button>
+      </div>
+      <!-- 封面裁剪台（#92）：选完图先裁成 3:4 书封比例再存 —— 书架上只写书名，
+           封面留给点开书籍后的详情那一张。
+           台面是全屏深色 + 居中裁剪框，图片可单指拖动、双指（或底部拉杆）缩放。
+           刻意不用 backdrop-filter（#12/#21 的帧率结论，新增浮层都不引）。
+           框外的暗罩用 .cr-frame 的 0 0 0 9999px 阴影铺出来：省掉四块遮罩 div，
+           也少四层合成。 -->
+      <div class="cropper" id="cropper" aria-hidden="true">
+        <div class="cr-head">
+          <div class="cr-title" id="crTitle">裁剪封面</div>
+          <div class="cr-sub" id="crSub">拖动挪位置 · 双指或拉杆缩放 · 只保留框内这一块（3:4）</div>
+        </div>
+        <div class="cr-stage" id="crStage">
+          <div class="cr-img" id="crImg"><img id="crImgEl" alt="" draggable="false"></div>
+          <div class="cr-frame" id="crFrame">
+            <span class="cr-g g1"></span><span class="cr-g g2"></span>
+            <span class="cr-g g3"></span><span class="cr-g g4"></span>
+            <i class="cr-c c1"></i><i class="cr-c c2"></i><i class="cr-c c3"></i><i class="cr-c c4"></i>
+          </div>
+        </div>
+        <div class="cr-bar">
+          <button class="cr-btn" id="crCancel" type="button">取消</button>
+          <div class="cr-zoom">
+            <span class="cr-zoom-ic" aria-hidden="true">－</span>
+            <input type="range" id="crZoom" min="100" max="400" step="1" value="100" aria-label="缩放图片">
+            <span class="cr-zoom-ic" aria-hidden="true">＋</span>
+          </div>
+          <button class="cr-btn main" id="crOk" type="button">用这一块</button>
+        </div>
+      </div>
+
+      <!-- 头像大图（#138 起，#141 改版）：点「我的」页的照片头像弹的整页看图层。
+           黑底 + 顶栏（返回 ‹ / 标题 / 「⋯」），像系统相册的看图页；点任意处仍可收起，
+           长按图片或点「⋯」弹下面的「保存到手机」抽屉。
+           z 72 = 盖住页内容与登录浮层(70)，又压不住引导链(76)/裁剪台(78) 那一层；
+           整层自己就是关闭热区，所以不再单独出一个 scrim，也不引 backdrop-filter（#12/#21）。 -->
+      <div class="avview" id="avView" role="dialog" aria-modal="true" aria-label="头像" aria-hidden="true">
+        <div class="avview-bar">
+          <button class="avview-btn" id="avViewBack" type="button" aria-label="返回">‹</button>
+          <div class="avview-title">头像</div>
+          <button class="avview-btn" id="avViewMore" type="button" aria-label="更多">⋯</button>
+        </div>
+        <img class="avview-img" id="avViewImg" alt="头像" draggable="false">
+        <div class="avview-cap" id="avViewCap" hidden></div>
+        <!-- 老账号的头像停在 128/256px（#141 之前那几版的输出边长），看图页放出来还是小一号。
+             #142 起给一条回头的路：一键回头像面板重选一张，选完当场存 profile（不必再进编辑资料）。 -->
+        <button class="avview-reset" id="avViewReset" type="button" hidden>重新设置头像</button>
+      </div>
+
+      <!-- 保存头像抽屉（#141）：长按大图或点「⋯」弹起；白底两行（保存到手机 / 取消），
+           照系统相册的动作表画。z 73 压在大图上；保存走原生 GallerySave，网页版退化为下载。 -->
+      <div class="avasave" id="avaSave" role="dialog" aria-modal="true" aria-label="保存头像" aria-hidden="true">
+        <div class="avasave-scrim" id="avaSaveMask"></div>
+        <div class="avasave-sheet">
+          <button class="avasave-row" id="avaSaveOk" type="button">保存到手机</button>
+          <button class="avasave-row is-cancel" id="avaSaveCancel" type="button">取消</button>
+        </div>
+      </div>
+
+      <!-- #68：老用户冷启动的纯色遮罩 —— 跳过封面后盖住首帧的排版栅格化过程，
+           两帧后淡出。颜色跟主题（浅 = --cover-bg，深 = #0e0e10），与系统开屏同色无缝。 -->
+      <div id="bootveil" hidden></div>
+    </div>
+  </div>
+</div>
+
+<!-- 封面选图用的两个隐藏 input，全局一份。
+     放在表单外面：加书表单体是 innerHTML 反复重建的，input 跟着重建会丢监听。
+     相册那份不带 capture，拍照那份带 —— Capacitor 会按它分流到系统相机。 -->
+  <input type="file" id="coverAlbum" accept="image/*" hidden>
+  <input type="file" id="coverCam" accept="image/*" capture="environment" hidden>
+  <!-- 日记封面图（#161）：不随任何面板重建，change 监听只注册一次（同书封面那条理由）。 -->
+  <input type="file" id="heroPhoto" accept="image/*" hidden>
+
+<script src="config.js"></script>
+<script src="app.js?v=114"></script>
+</body>
+</html>

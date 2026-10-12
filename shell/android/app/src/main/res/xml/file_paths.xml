@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- v1.94 收窄：原先 path="." 把整个外部存储与 cache 根都暴露给 FileProvider，
+         而代码里没有任何地方走 FileProvider 分享 —— 留最小声明，将来真用再加。 -->
+    <external-path name="my_images" path="Pictures/ReadTrace/" />
+</paths>

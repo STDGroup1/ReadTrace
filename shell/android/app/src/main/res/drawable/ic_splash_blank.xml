@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 系统开屏的图标：**故意留空**（全透明）。#60 起启用，替代原先的 ic_splash_icon。
+
+为什么留空 —— 现象是「从点击应用到出现启动动画，总感觉卡了一帧」。
+根因**不是白屏**：@capacitor/splash-screen 6.0.4 用 addOnPreDrawListener 等 WebView
+首帧准备好才开始计时（launchShowDuration），300ms 后带 200ms 淡出，底下始终有内容。
+
+真正的问题是**交叉淡出的两个画面形态对不上**：
+  · 系统开屏显示 ic_splash_icon = 悬空墨线稿（不带纸块，不透明像素仅占画布 2.8%、内容占 51.8%）
+  · 启动页 #launch 显示 cover.png = 带纸白圆角块的封面（不透明像素占 95%）
+线稿在屏上约占屏宽 21%，而封面里的线稿约占 56%（差 2.7 倍）；垂直中心也差一截
+（系统开屏居中 50%，启动页因下方还有「阅迹 / ReadTrace / 点 / 按钮」把整列顶上去，封面约在 40%）。
+再加上启动页封面本身还带 coverIn 淡入（300ms 时才走到约 55% 不透明）。
+于是那 200ms 里是「悬空小线稿淡出 + 半透明大纸块淡入」两种形态互相打架，看着就是卡了一帧。
+
+解法：让系统开屏**只留底色**。它的 splashBackground(#e9dec6) 与前端的封面底色
+自定义属性（styles.css 里的 cover-bg）**逐像素同值**，交接处因此完全无缝 ——
+用户看到的是「一片暖米色 → 封面从这片米色里浮现」。
+
+ic_splash_icon.png（288dp 规格 × 5 个 dpi，合计约 309 KB）保留不删，留作回退；
+gen_cover_assets.py 仍会产出它。改回旧观感只需把下面两处 styles.xml 的
+windowSplashScreenAnimatedIcon 指回 @drawable/ic_splash_icon。 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#00000000" />
+    <size android:width="108dp" android:height="108dp" />
+</shape>
